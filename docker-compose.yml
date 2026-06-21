@@ -1,0 +1,61 @@
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: kdaf-neo4j
+    ports:
+      - "${KDAF_NEO4J_HTTP_PORT:-7474}:7474"
+      - "${KDAF_NEO4J_BOLT_PORT:-7687}:7687"
+    environment:
+      NEO4J_AUTH: "${KDAF_NEO4J_USER:-neo4j}/${KDAF_NEO4J_PASSWORD:-kdaf_neo4j_password}"
+      NEO4J_initial_dbms_default__database: "${KDAF_NEO4J_DATABASE:-neo4j}"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${KDAF_NEO4J_USER:-neo4j} -p ${KDAF_NEO4J_PASSWORD:-kdaf_neo4j_password} 'RETURN 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  metadata-db:
+    image: postgres:16
+    container_name: kdaf-metadata-db
+    ports:
+      - "${KDAF_METADATA_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: "${KDAF_METADATA_DB_NAME:-kdaf_metadata}"
+      POSTGRES_USER: "${KDAF_METADATA_DB_USER:-kdaf_metadata}"
+      POSTGRES_PASSWORD: "${KDAF_METADATA_DB_PASSWORD:-kdaf_metadata_password}"
+    volumes:
+      - metadata_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KDAF_METADATA_DB_USER:-kdaf_metadata} -d ${KDAF_METADATA_DB_NAME:-kdaf_metadata}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  financial-dwh:
+    image: postgres:16
+    container_name: kdaf-financial-dwh
+    ports:
+      - "${KDAF_DWH_DB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: "${KDAF_DWH_DB_NAME:-kdaf_financial_dwh}"
+      POSTGRES_USER: "${KDAF_DWH_DB_USER:-kdaf_dwh}"
+      POSTGRES_PASSWORD: "${KDAF_DWH_DB_PASSWORD:-kdaf_dwh_password}"
+    volumes:
+      - financial_dwh_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KDAF_DWH_DB_USER:-kdaf_dwh} -d ${KDAF_DWH_DB_NAME:-kdaf_financial_dwh}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  metadata_db_data:
+  financial_dwh_data:
