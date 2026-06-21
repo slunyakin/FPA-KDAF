@@ -1,0 +1,23 @@
+[runtime]
+environment = "local"
+log_level = "INFO"
+
+[metadata_db]
+host = "localhost"
+port = 5432
+database = "kdaf_metadata"
+user = "kdaf_metadata"
+password = "kdaf_metadata_password"
+
+[dwh_db]
+host = "localhost"
+port = 5433
+database = "kdaf_financial_dwh"
+user = "kdaf_dwh"
+password = "kdaf_dwh_password"
+
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "kdaf_neo4j_password"
+database = "neo4j"
