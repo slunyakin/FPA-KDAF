@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kdaf"
-version = "0.1.0"
+version = "0.2.0"
 description = "Knowledge-Driven Analytics Framework for finance-focused semantic context and financial data warehousing."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,10 @@ classifiers = [
   "Topic :: Office/Business :: Financial",
 ]
 dependencies = []
+
+[project.scripts]
+kdaf = "kdaf.cli:main"
+kdaf-tool-server = "kdaf.tool_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -55,3 +59,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kdaf"]
