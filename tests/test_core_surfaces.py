@@ -63,6 +63,20 @@ def test_tool_server_handles_json_line_health_request(tmp_path) -> None:
     assert response["result"]["status"] == "ok"
 
 
+def test_tool_server_malformed_json_line_returns_error_and_keeps_serving(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    stdin = StringIO('{"tool": "health"\n{"tool": "health", "arguments": {}}\n')
+    stdout = StringIO()
+
+    serve(core=core, stdin=stdin, stdout=stdout)
+
+    responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+    assert responses[0]["ok"] is False
+    assert responses[0]["error"]["code"] == "invalid_json"
+    assert responses[1]["ok"] is True
+    assert responses[1]["result"]["status"] == "ok"
+
+
 def test_tool_server_accepts_mcp_style_tool_call_shape(tmp_path) -> None:
     core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
 
@@ -76,3 +90,79 @@ def test_tool_server_accepts_mcp_style_tool_call_shape(tmp_path) -> None:
 
     assert response["ok"] is True
     assert response["result"]["name"] == "MCP Project"
+
+
+def test_tool_server_missing_tool_name_returns_structured_error(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message({"arguments": {}}, core)
+
+    assert response == {
+        "ok": False,
+        "error": {"code": "missing_tool", "message": "Missing required tool name"},
+    }
+
+
+def test_tool_server_unknown_tool_returns_structured_error(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message({"tool": "missing.tool", "arguments": {}}, core)
+
+    assert response == {
+        "ok": False,
+        "error": {"code": "unknown_tool", "message": "Unknown tool: missing.tool"},
+    }
+
+
+def test_tool_server_missing_required_argument_returns_structured_error(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message({"tool": "project.get", "arguments": {}}, core)
+
+    assert response == {
+        "ok": False,
+        "error": {"code": "missing_argument", "message": "Missing required argument: id"},
+    }
+
+
+def test_tool_server_invalid_project_and_run_ids_return_structured_errors(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    project_response = handle_message(
+        {"tool": "project.get", "arguments": {"id": "missing-project"}},
+        core,
+    )
+    run_response = handle_message(
+        {"tool": "run.get", "arguments": {"id": "missing-run"}},
+        core,
+    )
+
+    assert project_response == {
+        "ok": False,
+        "error": {"code": "not_found", "message": "Project not found: missing-project"},
+    }
+    assert run_response == {
+        "ok": False,
+        "error": {"code": "not_found", "message": "Run not found: missing-run"},
+    }
+
+
+def test_cli_invalid_project_id_returns_structured_error(tmp_path) -> None:
+    stdout = StringIO()
+
+    exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(tmp_path / "metadata.sqlite3"),
+            "project",
+            "get",
+            "missing-project",
+        ],
+        stdout=stdout,
+    )
+
+    assert exit_code == 2
+    assert json.loads(stdout.getvalue()) == {
+        "ok": False,
+        "error": {"code": "not_found", "message": "Project not found: missing-project"},
+    }

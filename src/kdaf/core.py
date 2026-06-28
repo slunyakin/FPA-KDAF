@@ -13,6 +13,11 @@ from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
 class KdafError(ValueError):
     """Stable v0.2 application error for operator and agent surfaces."""
 
+    def __init__(self, message: str, code: str = "kdaf_error") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
 
 @dataclass(frozen=True)
 class HealthStatus:
@@ -65,7 +70,7 @@ class KdafCore:
         try:
             return self.metadata.create_project(name=name, description=description).to_dict()
         except MetadataError as exc:
-            raise KdafError(str(exc)) from exc
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
     def list_projects(self) -> list[dict[str, str]]:
         return [project.to_dict() for project in self.metadata.list_projects()]
@@ -74,25 +79,25 @@ class KdafCore:
         try:
             return self.metadata.get_project(project_id).to_dict()
         except MetadataError as exc:
-            raise KdafError(str(exc)) from exc
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
     def create_run(self, project_id: str, status: str = "created") -> dict[str, str]:
         try:
             return self.metadata.create_run(project_id=project_id, status=status).to_dict()
         except MetadataError as exc:
-            raise KdafError(str(exc)) from exc
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
     def list_runs(self, project_id: str | None = None) -> list[dict[str, str]]:
         try:
             return [run.to_dict() for run in self.metadata.list_runs(project_id=project_id)]
         except MetadataError as exc:
-            raise KdafError(str(exc)) from exc
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
     def get_run(self, run_id: str) -> dict[str, str]:
         try:
             return self.metadata.get_run(run_id).to_dict()
         except MetadataError as exc:
-            raise KdafError(str(exc)) from exc
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
 
 def _safe_database_summary(database_config: Any) -> dict[str, Any]:
@@ -103,3 +108,9 @@ def _safe_database_summary(database_config: Any) -> dict[str, Any]:
         "user": database_config.user,
         "role": database_config.role,
     }
+
+
+def _metadata_error_code(error: MetadataError) -> str:
+    if "not found" in str(error).lower():
+        return "not_found"
+    return "metadata_error"

@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None, stdout: TextIO | None = None) -> int:
     try:
         result = _dispatch(args)
     except KdafError as exc:
-        _write_json({"error": str(exc)}, output)
+        _write_json({"ok": False, "error": {"code": exc.code, "message": exc.message}}, output)
         return 2
 
     _write_json(result, output)

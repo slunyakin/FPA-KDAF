@@ -44,10 +44,21 @@ def serve(core: KdafCore, stdin: TextIO, stdout: TextIO) -> None:
     for line in stdin:
         if not line.strip():
             continue
-        response = handle_message(json.loads(line), core)
+        response = handle_json_line(line, core)
         stdout.write(json.dumps(response, sort_keys=True))
         stdout.write("\n")
         stdout.flush()
+
+
+def handle_json_line(line: str, core: KdafCore) -> dict[str, Any]:
+    try:
+        message = json.loads(line)
+    except json.JSONDecodeError as exc:
+        return _error_response("invalid_json", f"Malformed JSON: {exc.msg}")
+
+    if not isinstance(message, dict):
+        return _error_response("invalid_request", "Tool request must be a JSON object")
+    return handle_message(message, core)
 
 
 def handle_message(message: dict[str, Any], core: KdafCore) -> dict[str, Any]:
@@ -58,8 +69,8 @@ def handle_message(message: dict[str, Any], core: KdafCore) -> dict[str, Any]:
         tool_name, arguments = _extract_call(message)
         result = call_tool(tool_name, arguments, core)
         return {"ok": True, "result": result}
-    except (KdafError, KeyError, TypeError, ValueError) as exc:
-        return {"ok": False, "error": str(exc)}
+    except KdafError as exc:
+        return _error_response(exc.code, exc.message)
 
 
 def list_tools() -> list[dict[str, str]]:
@@ -68,6 +79,11 @@ def list_tools() -> list[dict[str, str]]:
 
 def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) -> Any:
     args = {} if arguments is None else arguments
+    if not isinstance(args, dict):
+        raise KdafError("Tool arguments must be a JSON object", code="invalid_arguments")
+    if not isinstance(tool_name, str) or not tool_name.strip():
+        raise KdafError("Missing required tool name", code="missing_tool")
+
     if tool_name == "health":
         return core.health()
     if tool_name == "config":
@@ -90,21 +106,32 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.list_runs(project_id=args.get("project_id"))
     if tool_name == "run.get":
         return core.get_run(_required_arg(args, "id"))
-    raise KdafError(f"Unknown tool: {tool_name}")
+    raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 
 def _extract_call(message: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     if message.get("method") == "tools/call":
-        params = message["params"]
+        params = message.get("params")
+        if not isinstance(params, dict):
+            raise KdafError("Missing tools/call params object", code="invalid_request")
+        if "name" not in params:
+            raise KdafError("Missing required tool name", code="missing_tool")
         return params["name"], params.get("arguments", {})
+
+    if "tool" not in message:
+        raise KdafError("Missing required tool name", code="missing_tool")
     return message["tool"], message.get("arguments", {})
 
 
 def _required_arg(arguments: dict[str, Any], name: str) -> str:
     value = arguments.get(name)
     if not isinstance(value, str) or not value.strip():
-        raise KdafError(f"Missing required argument: {name}")
+        raise KdafError(f"Missing required argument: {name}", code="missing_argument")
     return value
+
+
+def _error_response(code: str, message: str) -> dict[str, Any]:
+    return {"ok": False, "error": {"code": code, "message": message}}
 
 
 if __name__ == "__main__":

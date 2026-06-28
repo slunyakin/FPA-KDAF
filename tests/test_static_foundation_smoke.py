@@ -31,3 +31,14 @@ def test_static_docker_compose_structure() -> None:
     assert "neo4j_data:" in compose
     assert "kdaf_metadata" in compose
     assert "kdaf_financial_dwh" in compose
+
+
+@pytest.mark.smoke
+def test_readme_documents_v02_public_commands() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "v0.2" in readme
+    assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 health" in readme
+    assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 project create" in readme
+    assert "kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3" in readme
+    assert '"tool":"health"' in readme

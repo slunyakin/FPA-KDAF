@@ -20,7 +20,8 @@ lives in `kdaf.core.KdafCore` and `kdaf.metadata.MetadataRepository`.
 - CLI commands emit JSON with sorted keys and newline termination.
 - Tool server requests accept JSON lines using either `{"tool": "...", "arguments": {...}}` or the
   MCP-style `{"method": "tools/call", "params": {"name": "...", "arguments": {...}}}` shape.
-- Tool server responses use `{"ok": true, "result": ...}` or `{"ok": false, "error": "..."}`.
+- Tool server responses use `{"ok": true, "result": ...}` or
+  `{"ok": false, "error": {"code": "...", "message": "..."}}`.
 - Project and run records expose string IDs, ISO-8601 UTC `created_at` timestamps, and stable field
   names.
 - The metadata store defaults to `.kdaf/metadata.sqlite3` and can be overridden with
@@ -29,8 +30,9 @@ lives in `kdaf.core.KdafCore` and `kdaf.metadata.MetadataRepository`.
 ## Error Model
 
 Core-facing adapters catch `KdafError` and convert it to their transport format. Repository-specific
-failures use `MetadataError` internally and are normalized by `KdafCore`. v0.2 does not expose typed
-error codes yet.
+failures use `MetadataError` internally and are normalized by `KdafCore`. v0.2 exposes lightweight
+string error codes such as `invalid_json`, `missing_tool`, `unknown_tool`, `missing_argument`, and
+`not_found`.
 
 ## Stubbed Areas
 
