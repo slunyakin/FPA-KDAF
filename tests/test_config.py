@@ -11,6 +11,7 @@ def test_config_loads_defaults_covering_all_runtime_services() -> None:
     config = load_config()
 
     assert config.runtime.environment == "local"
+    assert config.runtime.metadata_store_path == ".kdaf/metadata.sqlite3"
     assert config.metadata_db.role == "metadata"
     assert config.metadata_db.database == "kdaf_metadata"
     assert config.metadata_db.port == 5432
@@ -34,6 +35,7 @@ def test_environment_overrides_metadata_dwh_neo4j_and_runtime_settings() -> None
         environ={
             "KDAF_ENV": "test",
             "KDAF_LOG_LEVEL": "DEBUG",
+            "KDAF_METADATA_STORE_PATH": "/tmp/kdaf-test.sqlite3",
             "KDAF_METADATA_DB_HOST": "metadata.internal",
             "KDAF_METADATA_DB_PORT": "15432",
             "KDAF_METADATA_DB_NAME": "metadata_test",
@@ -53,6 +55,7 @@ def test_environment_overrides_metadata_dwh_neo4j_and_runtime_settings() -> None
 
     assert config.runtime.environment == "test"
     assert config.runtime.log_level == "DEBUG"
+    assert config.runtime.metadata_store_path == "/tmp/kdaf-test.sqlite3"
     assert config.metadata_db.host == "metadata.internal"
     assert config.metadata_db.port == 15432
     assert config.metadata_db.database == "metadata_test"

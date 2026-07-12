@@ -14,13 +14,15 @@ Financial numbers must not be stored in the graph. The graph explains what finan
 
 ## Architecture
 
-The v0.1 local runtime contains three backing services:
+The v0.2 local runtime contains three backing services plus a local metadata store used by the CLI
+and MCP-style tool server:
 
 | Service | Purpose | Default local connection |
 | --- | --- | --- |
 | Neo4j | Semantic graph | `bolt://localhost:7687`, browser `http://localhost:7474` |
 | Postgres metadata DB | Framework metadata | `localhost:5432/kdaf_metadata` |
 | Postgres financial DWH | Financial numbers and facts | `localhost:5433/kdaf_financial_dwh` |
+| SQLite metadata store | v0.2 project/run metadata | `.kdaf/metadata.sqlite3` |
 
 Configuration loads from built-in defaults, optionally from `config/kdaf.example.toml`, and then from `KDAF_*` environment variables.
 
@@ -30,7 +32,7 @@ KDAF starts as a local-first framework. The default Docker Compose stack is suit
 
 ## Non-Goals
 
-- KDAF v0.1 is not a production deployment template.
+- KDAF v0.2 is not a production deployment template.
 - KDAF does not prescribe a single finance domain model.
 - KDAF does not store financial facts, measures, or time series values in Neo4j.
 - KDAF does not require Docker for static tests or package development.
@@ -64,6 +66,52 @@ pytest -m integration
 ```
 
 The integration smoke test skips cleanly when Docker is unavailable.
+
+## CLI and Tool Server
+
+KDAF v0.2 adds a human CLI and an MCP-style JSON-line tool server. Both surfaces use the same
+`KdafCore` APIs and the same metadata store.
+
+Run a health check:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 health
+```
+
+Show the non-secret config summary:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 config
+```
+
+Create, list, and read projects:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 project create "Demo Project"
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 project list
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 project get <project-id>
+```
+
+Create and read runs:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 run create <project-id>
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 run get <run-id>
+```
+
+Call the tool server with JSON-line requests:
+
+```bash
+printf '{"tool":"health","arguments":{}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"project.create","arguments":{"name":"Agent Project"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+```
+
+Tool-server success responses use `{"ok": true, "result": ...}`. Errors use
+`{"ok": false, "error": {"code": "...", "message": "..."}}`, including malformed JSON lines and
+invalid tool requests.
 
 ## Local Services
 
@@ -105,4 +153,5 @@ pytest -m integration
 
 ## Project Status
 
-KDAF is in v0.1 foundation scope: package scaffold, project identity, local infrastructure, typed configuration, and smoke tests.
+KDAF is in v0.2 agent/tooling scope: v0.1 local infrastructure, typed configuration, shared core
+APIs, project/run metadata persistence, a CLI shell, an MCP-style tool server, and parity tests.

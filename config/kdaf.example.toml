@@ -1,6 +1,7 @@
 [runtime]
 environment = "local"
 log_level = "INFO"
+metadata_store_path = ".kdaf/metadata.sqlite3"
 
 [metadata_db]
 host = "localhost"

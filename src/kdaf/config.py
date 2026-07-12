@@ -17,6 +17,7 @@ class ConfigError(ValueError):
 class RuntimeConfig:
     environment: str = "local"
     log_level: str = "INFO"
+    metadata_store_path: str = ".kdaf/metadata.sqlite3"
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ DEFAULT_CONFIG = KdafConfig(
 ENV_OVERRIDES = {
     "KDAF_ENV": ("runtime", "environment"),
     "KDAF_LOG_LEVEL": ("runtime", "log_level"),
+    "KDAF_METADATA_STORE_PATH": ("runtime", "metadata_store_path"),
     "KDAF_METADATA_DB_HOST": ("metadata_db", "host"),
     "KDAF_METADATA_DB_PORT": ("metadata_db", "port"),
     "KDAF_METADATA_DB_NAME": ("metadata_db", "database"),
@@ -174,6 +176,7 @@ def _coerce_value(section: str, field: str, value: Any) -> Any:
 def _validate_config(config: KdafConfig) -> None:
     _require_non_empty("runtime.environment", config.runtime.environment)
     _require_non_empty("runtime.log_level", config.runtime.log_level)
+    _require_non_empty("runtime.metadata_store_path", config.runtime.metadata_store_path)
 
     for name in ("metadata_db", "dwh_db"):
         db = getattr(config, name)

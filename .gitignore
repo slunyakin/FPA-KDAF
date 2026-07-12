@@ -7,3 +7,5 @@ dist/
 build/
 .env
 .DS_Store
+.kdaf/
+*.sqlite3
