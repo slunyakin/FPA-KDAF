@@ -51,6 +51,81 @@ def test_tool_server_created_project_is_visible_through_cli(tmp_path) -> None:
     assert json.loads(stdout.getvalue())["name"] == "Agent Project"
 
 
+def test_cli_loads_starter_dwh_and_returns_sample_facts(tmp_path) -> None:
+    metadata_store = tmp_path / "metadata.sqlite3"
+    dwh_store = tmp_path / "starter_dwh.sqlite3"
+    load_stdout = StringIO()
+
+    load_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(metadata_store),
+            "starter-dwh",
+            "load",
+            "--dwh-store",
+            str(dwh_store),
+        ],
+        stdout=load_stdout,
+    )
+
+    assert load_exit_code == 0
+    assert json.loads(load_stdout.getvalue())["row_counts"]["fpna_facts"] == 24
+
+    facts_stdout = StringIO()
+    facts_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(metadata_store),
+            "starter-dwh",
+            "facts",
+            "--dwh-store",
+            str(dwh_store),
+        ],
+        stdout=facts_stdout,
+    )
+
+    assert facts_exit_code == 0
+    facts = json.loads(facts_stdout.getvalue())
+    assert facts["budget_vs_actuals"][0]["variance_amount"] == 5000
+    assert facts["department_spend"][0]["department_name"] == "Engineering"
+
+
+def test_tool_server_loads_starter_dwh_and_returns_sample_facts(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    dwh_store = tmp_path / "starter_dwh.sqlite3"
+
+    load_response = handle_message(
+        {"tool": "starter_dwh.load", "arguments": {"dwh_store_path": str(dwh_store)}},
+        core,
+    )
+    facts_response = handle_message(
+        {"tool": "starter_dwh.facts", "arguments": {"dwh_store_path": str(dwh_store)}},
+        core,
+    )
+
+    assert load_response["ok"] is True
+    assert load_response["result"]["row_counts"]["fpna_facts"] == 24
+    assert facts_response["ok"] is True
+    assert facts_response["result"]["budget_vs_actuals"][1]["actual_amount"] == 108000
+
+
+def test_tool_server_starter_dwh_facts_before_load_returns_structured_error(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message(
+        {"tool": "starter_dwh.facts", "arguments": {"dwh_store_path": str(tmp_path / "empty.db")}},
+        core,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "starter_dwh_not_loaded",
+            "message": "Starter DWH has not been loaded",
+        },
+    }
+
+
 def test_tool_server_handles_json_line_health_request(tmp_path) -> None:
     core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
     stdin = StringIO('{"tool": "health", "arguments": {}}\n')
