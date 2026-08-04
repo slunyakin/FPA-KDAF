@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from kdaf.metadata import MetadataError, MetadataRepository
@@ -136,3 +138,35 @@ def test_schema_contains_v02_extension_points(tmp_path) -> None:
         "kdaf_mvg_questions",
         "kdaf_mvg_concepts",
     } <= repository.table_names()
+
+
+def test_v02_placeholder_schema_migrates_to_v04_without_data_loss(tmp_path) -> None:
+    store = tmp_path / "metadata.sqlite3"
+    with sqlite3.connect(store) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE kdaf_source_registry (
+                id TEXT PRIMARY KEY, source_type TEXT NOT NULL,
+                locator TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE kdaf_validation_queue (
+                id TEXT PRIMARY KEY, project_id TEXT, status TEXT NOT NULL,
+                payload_json TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE kdaf_audit_log (
+                id TEXT PRIMARY KEY, event_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO kdaf_source_registry VALUES ('legacy', 'csv', 'old.csv', '2026-01-01')"
+        )
+
+    repository = MetadataRepository(store)
+    repository.initialize_schema()
+
+    source = repository.get_source("legacy")
+    assert source.locator == "old.csv"
+    assert source.name == "Unnamed source"
+    assert "kdaf_validation_decisions" in repository.table_names()

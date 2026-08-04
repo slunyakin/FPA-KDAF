@@ -46,3 +46,24 @@ def test_readme_documents_v02_public_commands() -> None:
     assert '"tool":"health"' in readme
     assert '"tool":"starter_dwh.load"' in readme
     assert '"tool":"starter_graph.load"' in readme
+
+
+@pytest.mark.smoke
+def test_v04_contract_and_demo_are_published() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    contract = Path("docs/provenance-validation-contract-v0.4.md").read_text(encoding="utf-8")
+    sample = Path("examples/v04_actuals.csv").read_text(encoding="utf-8")
+
+    assert "source register" in readme
+    assert "validation approve" in readme
+    for requirement in (
+        "Source registry",
+        "Extracted artifacts and provenance",
+        "Validation queue and state machine",
+        "Reviewer decisions and audit expectations",
+        "Postgres metadata DB",
+        "Separate Postgres DWH",
+        "Neo4j",
+    ):
+        assert requirement in contract
+    assert sample.startswith("entity,department,account,period,scenario,amount")

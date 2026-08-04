@@ -14,8 +14,8 @@ Financial numbers must not be stored in the graph. The graph explains what finan
 
 ## Architecture
 
-The v0.2 local runtime contains three backing services plus a local metadata store used by the CLI
-and MCP-style tool server:
+The local runtime contains three backing services plus dependency-free local adapters used by the
+CLI and MCP-style tool server:
 
 | Service | Purpose | Default local connection |
 | --- | --- | --- |
@@ -23,6 +23,12 @@ and MCP-style tool server:
 | Postgres metadata DB | Framework metadata | `localhost:5432/kdaf_metadata` |
 | Postgres financial DWH | Financial numbers and facts | `localhost:5433/kdaf_financial_dwh` |
 | SQLite metadata store | v0.2 project/run metadata | `.kdaf/metadata.sqlite3` |
+| SQLite extraction DWH adapter | v0.4 extracted financial rows | `.kdaf/extraction_dwh.sqlite3` |
+| SQLite graph adapter | v0.4 semantic provenance references only | `.kdaf/graph_context.sqlite3` |
+
+The v0.4 SQLite files preserve the same physical boundaries as production Postgres and Neo4j. They
+are a local execution harness, not a change to storage ownership: CSV values go only to the DWH
+adapter, while graph provenance contains identifiers and relationships only.
 
 Configuration loads from built-in defaults, optionally from `config/kdaf.example.toml`, and then from `KDAF_*` environment variables.
 
@@ -225,6 +231,57 @@ Tool-server success responses use `{"ok": true, "result": ...}`. Errors use
 `{"ok": false, "error": {"code": "...", "message": "..."}}`, including malformed JSON lines and
 invalid tool requests.
 
+## v0.4 Extraction and Validation Demo
+
+The source-to-review vertical slice uses the sample file at `examples/v04_actuals.csv`. Choose
+separate local files for metadata, extracted financial rows, and graph context:
+
+```bash
+kdaf \
+  --metadata-store .kdaf/v04-metadata.sqlite3 \
+  --dwh-store .kdaf/v04-financial-dwh.sqlite3 \
+  --graph-store .kdaf/v04-graph.sqlite3 \
+  source register "January actuals" examples/v04_actuals.csv
+```
+
+Copy the returned source `id`, then extract and inspect its provenance:
+
+```bash
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 \
+  --dwh-store .kdaf/v04-financial-dwh.sqlite3 \
+  --graph-store .kdaf/v04-graph.sqlite3 source extract <source-id>
+
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 \
+  --dwh-store .kdaf/v04-financial-dwh.sqlite3 \
+  --graph-store .kdaf/v04-graph.sqlite3 provenance get <extraction-id>
+```
+
+Queue the extraction for expert review. A comment moves it to `needs_changes`; it may then be
+approved or rejected. Every action is timestamped in the returned `decisions` history.
+
+```bash
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 \
+  validation enqueue extraction <extraction-id>
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 \
+  validation comment <validation-id> --reviewer controller --comment "Recheck totals"
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 \
+  validation approve <validation-id> --reviewer controller --comment "Totals reconcile"
+kdaf --metadata-store .kdaf/v04-metadata.sqlite3 validation list --status approved
+```
+
+The same workflow is available to agents through `source.register`, `source.extract`,
+`source.extractions`, `provenance.get`, `validation.enqueue`, `validation.list`, `validation.get`,
+`validation.comment`, `validation.approve`, and `validation.reject` tools. For example:
+
+```bash
+printf '%s\n' \
+  '{"tool":"validation.approve","arguments":{"id":"<validation-id>","reviewer":"controller"}}' \
+  | kdaf-tool-server --metadata-store .kdaf/v04-metadata.sqlite3
+```
+
+See [the v0.4 lifecycle contract](docs/provenance-validation-contract-v0.4.md) for fields, state
+transitions, audit expectations, and storage-boundary details.
+
 ## Local Services
 
 Copy `.env.example` if you want to customize ports or credentials:
@@ -265,7 +322,8 @@ pytest -m integration
 
 ## Project Status
 
-KDAF is moving through v0.3 FP&A starter-kit scope. The current public surface includes v0.1 local
-infrastructure, typed configuration, shared core APIs, project/run metadata persistence, a CLI shell,
-an MCP-style tool server, parity tests, a starter FP&A DWH schema with seed data and sample finance
-queries, and a Neo4j-backed starter semantic graph for finance concepts.
+KDAF v0.4 adds a CSV source registry and extractor, cross-store provenance, an auditable expert
+validation queue, CLI/tool parity, and a runnable extraction-to-validation slice. The public surface
+also retains the v0.1 local infrastructure, v0.2 shared APIs, and the complete v0.3 starter kit:
+starter DWH, competency questions, MVG artifacts, starter question catalog, Neo4j semantic graph,
+and end-to-end starter-kit loader and demo.

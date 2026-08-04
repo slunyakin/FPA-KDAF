@@ -9,14 +9,20 @@ from kdaf.config import (
     load_config,
 )
 from kdaf.core import KdafCore, KdafError
+from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
+from kdaf.graph import GraphProvenanceRepository
 from kdaf.metadata import (
     CompetencyQuestion,
+    ExtractionBatch,
     MetadataError,
     MetadataRepository,
     MvgArtifact,
     PackageMetadata,
     Project,
+    ProvenanceLink,
     Run,
+    Source,
+    ValidationItem,
     package_metadata,
 )
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
@@ -36,11 +42,16 @@ from kdaf.starter_questions import (
     starter_question_catalog,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.4.0"
 __all__ = [
     "ConfigError",
     "CompetencyQuestion",
+    "CsvExtractor",
     "DatabaseConfig",
+    "ExtractionBatch",
+    "ExtractionDwhRepository",
+    "ExtractionError",
+    "GraphProvenanceRepository",
     "KdafCore",
     "KdafConfig",
     "KdafError",
@@ -51,8 +62,10 @@ __all__ = [
     "Neo4jConnectionSettings",
     "PackageMetadata",
     "Project",
+    "ProvenanceLink",
     "RuntimeConfig",
     "Run",
+    "Source",
     "StarterDwhError",
     "StarterDwhRepository",
     "StarterGraphError",
@@ -63,6 +76,7 @@ __all__ = [
     "StarterQuestionCatalog",
     "StarterQuestionCatalogError",
     "StarterQuestionLoadSummary",
+    "ValidationItem",
     "__version__",
     "load_config",
     "package_metadata",

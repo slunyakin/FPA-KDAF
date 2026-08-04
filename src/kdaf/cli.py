@@ -1,4 +1,4 @@
-"""Human/operator CLI for KDAF v0.2."""
+"""Human/operator CLI for KDAF."""
 
 from __future__ import annotations
 
@@ -11,10 +11,19 @@ from typing import Any, TextIO
 from kdaf.core import KdafCore, KdafError
 
 
+class SafeArgumentParser(argparse.ArgumentParser):
+    """Route parser failures through the CLI's stable JSON error envelope."""
+
+    def error(self, message: str) -> None:
+        raise KdafError(f"Invalid command: {message}", code="invalid_arguments")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="kdaf", description="KDAF operator CLI")
+    parser = SafeArgumentParser(prog="kdaf", description="KDAF operator CLI")
     parser.add_argument("--config", type=Path, help="Path to a KDAF TOML config file")
     parser.add_argument("--metadata-store", type=Path, help="Path to the local metadata SQLite DB")
+    parser.add_argument("--dwh-store", type=Path, help="Path to the local extraction DWH adapter")
+    parser.add_argument("--graph-store", type=Path, help="Path to the local graph adapter")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -157,15 +166,54 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip Neo4j graph loading for offline or test environments",
     )
 
+    source = subparsers.add_parser("source", help="Register and extract structured sources")
+    source_subparsers = source.add_subparsers(dest="source_command", required=True)
+
+    source_register = source_subparsers.add_parser("register", help="Register a CSV source")
+    source_register.add_argument("name")
+    source_register.add_argument("locator")
+    source_register.add_argument("--type", default="csv", dest="source_type")
+    source_register.add_argument("--metadata-json", default="{}")
+    source_subparsers.add_parser("list", help="List registered sources")
+    source_get = source_subparsers.add_parser("get", help="Read a registered source")
+    source_get.add_argument("id")
+    source_extract = source_subparsers.add_parser("extract", help="Extract a registered source")
+    source_extract.add_argument("id")
+    source_extractions = source_subparsers.add_parser(
+        "extractions", help="List extraction attempts"
+    )
+    source_extractions.add_argument("--source-id")
+
+    provenance = subparsers.add_parser("provenance", help="Trace extraction provenance")
+    provenance_subparsers = provenance.add_subparsers(dest="provenance_command", required=True)
+    provenance_get = provenance_subparsers.add_parser("get", help="Trace an extraction batch")
+    provenance_get.add_argument("batch_id")
+
+    validation = subparsers.add_parser("validation", help="Manage expert validation")
+    validation_subparsers = validation.add_subparsers(dest="validation_command", required=True)
+    validation_enqueue = validation_subparsers.add_parser("enqueue")
+    validation_enqueue.add_argument("subject_type")
+    validation_enqueue.add_argument("subject_id")
+    validation_enqueue.add_argument("--payload-json", default="{}")
+    validation_list = validation_subparsers.add_parser("list")
+    validation_list.add_argument("--status")
+    validation_get = validation_subparsers.add_parser("get")
+    validation_get.add_argument("id")
+    for action in ("approve", "reject", "comment"):
+        action_parser = validation_subparsers.add_parser(action)
+        action_parser.add_argument("id")
+        action_parser.add_argument("--reviewer", required=True)
+        action_parser.add_argument("--comment", required=action == "comment", default="")
+
     return parser
 
 
 def main(argv: list[str] | None = None, stdout: TextIO | None = None) -> int:
     output = sys.stdout if stdout is None else stdout
     parser = build_parser()
-    args = parser.parse_args(argv)
 
     try:
+        args = parser.parse_args(argv)
         result = _dispatch(args)
     except KdafError as exc:
         _write_json({"ok": False, "error": {"code": exc.code, "message": exc.message}}, output)
@@ -176,7 +224,12 @@ def main(argv: list[str] | None = None, stdout: TextIO | None = None) -> int:
 
 
 def _dispatch(args: argparse.Namespace) -> Any:
-    core = KdafCore(config_path=args.config, metadata_store_path=args.metadata_store)
+    core = KdafCore(
+        config_path=args.config,
+        metadata_store_path=args.metadata_store,
+        dwh_store_path=args.dwh_store,
+        graph_store_path=args.graph_store,
+    )
 
     if args.command == "health":
         return core.health()
@@ -198,6 +251,12 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_starter_questions(core, args)
     if args.command == "starter-kit":
         return _dispatch_starter_kit(core, args)
+    if args.command == "source":
+        return _dispatch_source(core, args)
+    if args.command == "provenance":
+        return core.get_provenance(args.batch_id)
+    if args.command == "validation":
+        return _dispatch_validation(core, args)
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -291,6 +350,55 @@ def _dispatch_starter_kit(core: KdafCore, args: argparse.Namespace) -> Any:
             include_graph=not args.skip_graph,
         )
     raise KdafError(f"Unknown starter kit command: {args.starter_kit_command}")
+
+
+def _dispatch_source(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.source_command == "register":
+        return core.register_source(
+            args.name,
+            args.locator,
+            args.source_type,
+            _parse_json_object(args.metadata_json, "metadata-json"),
+        )
+    if args.source_command == "list":
+        return core.list_sources()
+    if args.source_command == "get":
+        return core.get_source(args.id)
+    if args.source_command == "extract":
+        return core.extract_source(args.id)
+    if args.source_command == "extractions":
+        return core.list_extractions(args.source_id)
+    raise KdafError(f"Unknown source command: {args.source_command}")
+
+
+def _dispatch_validation(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.validation_command == "enqueue":
+        return core.enqueue_validation(
+            args.subject_type,
+            args.subject_id,
+            _parse_json_object(args.payload_json, "payload-json"),
+        )
+    if args.validation_command == "list":
+        return core.list_validations(args.status)
+    if args.validation_command == "get":
+        return core.get_validation(args.id)
+    if args.validation_command == "approve":
+        return core.approve_validation(args.id, args.reviewer, args.comment)
+    if args.validation_command == "reject":
+        return core.reject_validation(args.id, args.reviewer, args.comment)
+    if args.validation_command == "comment":
+        return core.comment_validation(args.id, args.reviewer, args.comment)
+    raise KdafError(f"Unknown validation command: {args.validation_command}")
+
+
+def _parse_json_object(raw: str, option: str) -> dict[str, Any]:
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise KdafError(f"{option} must be valid JSON", code="invalid_input") from exc
+    if not isinstance(result, dict):
+        raise KdafError(f"{option} must be a JSON object", code="invalid_input")
+    return result
 
 
 def _write_json(payload: Any, output: TextIO) -> None:

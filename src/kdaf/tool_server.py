@@ -1,4 +1,4 @@
-"""MCP-style JSON-line tool server for KDAF v0.2."""
+"""MCP-style JSON-line tool server for KDAF."""
 
 from __future__ import annotations
 
@@ -36,6 +36,18 @@ TOOL_NAMES = (
     "starter_questions.catalog",
     "starter_questions.load",
     "starter_kit.load",
+    "source.register",
+    "source.list",
+    "source.get",
+    "source.extract",
+    "source.extractions",
+    "provenance.get",
+    "validation.enqueue",
+    "validation.list",
+    "validation.get",
+    "validation.approve",
+    "validation.reject",
+    "validation.comment",
 )
 
 
@@ -46,13 +58,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", type=Path, help="Path to a KDAF TOML config file")
     parser.add_argument("--metadata-store", type=Path, help="Path to the local metadata SQLite DB")
+    parser.add_argument("--dwh-store", type=Path, help="Path to the local extraction DWH adapter")
+    parser.add_argument("--graph-store", type=Path, help="Path to the local graph adapter")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    core = KdafCore(config_path=args.config, metadata_store_path=args.metadata_store)
+    core = KdafCore(
+        config_path=args.config,
+        metadata_store_path=args.metadata_store,
+        dwh_store_path=args.dwh_store,
+        graph_store_path=args.graph_store,
+    )
     serve(core=core, stdin=sys.stdin, stdout=sys.stdout)
     return 0
 
@@ -88,6 +107,9 @@ def handle_message(message: dict[str, Any], core: KdafCore) -> dict[str, Any]:
         return {"ok": True, "result": result}
     except KdafError as exc:
         return _error_response(exc.code, exc.message)
+    except Exception:
+        # Keep the long-running server alive and never return config, paths, or stack traces.
+        return _error_response("internal_error", "The tool request could not be completed")
 
 
 def list_tools() -> list[dict[str, str]]:
@@ -176,6 +198,51 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             project_id=_required_arg(args, "project_id"),
             dwh_store_path=args.get("dwh_store_path"),
             include_graph=_optional_bool_arg(args, "include_graph", default=True),
+        )
+    if tool_name == "source.register":
+        return core.register_source(
+            name=_required_arg(args, "name"),
+            locator=_required_arg(args, "locator"),
+            source_type=args.get("source_type", "csv"),
+            metadata=args.get("metadata", {}),
+        )
+    if tool_name == "source.list":
+        return core.list_sources()
+    if tool_name == "source.get":
+        return core.get_source(_required_arg(args, "id"))
+    if tool_name == "source.extract":
+        return core.extract_source(_required_arg(args, "id"))
+    if tool_name == "source.extractions":
+        return core.list_extractions(args.get("source_id"))
+    if tool_name == "provenance.get":
+        return core.get_provenance(_required_arg(args, "batch_id"))
+    if tool_name == "validation.enqueue":
+        return core.enqueue_validation(
+            _required_arg(args, "subject_type"),
+            _required_arg(args, "subject_id"),
+            args.get("payload", {}),
+        )
+    if tool_name == "validation.list":
+        return core.list_validations(args.get("status"))
+    if tool_name == "validation.get":
+        return core.get_validation(_required_arg(args, "id"))
+    if tool_name == "validation.approve":
+        return core.approve_validation(
+            _required_arg(args, "id"),
+            _required_arg(args, "reviewer"),
+            args.get("comment", ""),
+        )
+    if tool_name == "validation.reject":
+        return core.reject_validation(
+            _required_arg(args, "id"),
+            _required_arg(args, "reviewer"),
+            args.get("comment", ""),
+        )
+    if tool_name == "validation.comment":
+        return core.comment_validation(
+            _required_arg(args, "id"),
+            _required_arg(args, "reviewer"),
+            _required_arg(args, "comment"),
         )
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
