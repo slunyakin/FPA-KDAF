@@ -19,6 +19,9 @@ TOOL_NAMES = (
     "run.create",
     "run.list",
     "run.get",
+    "starter_dwh.schema",
+    "starter_dwh.load",
+    "starter_dwh.facts",
 )
 
 
@@ -106,6 +109,12 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.list_runs(project_id=args.get("project_id"))
     if tool_name == "run.get":
         return core.get_run(_required_arg(args, "id"))
+    if tool_name == "starter_dwh.schema":
+        return core.starter_dwh_schema()
+    if tool_name == "starter_dwh.load":
+        return core.load_starter_dwh(dwh_store_path=args.get("dwh_store_path"))
+    if tool_name == "starter_dwh.facts":
+        return core.starter_dwh_sample_facts(dwh_store_path=args.get("dwh_store_path"))
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 

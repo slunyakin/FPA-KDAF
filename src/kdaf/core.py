@@ -8,6 +8,7 @@ from typing import Any
 
 from kdaf.config import KdafConfig, load_config
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
+from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 
 
 class KdafError(ValueError):
@@ -98,6 +99,35 @@ class KdafCore:
             return self.metadata.get_run(run_id).to_dict()
         except MetadataError as exc:
             raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def starter_dwh_schema(self) -> dict[str, str]:
+        artifacts = starter_dwh_sql_artifacts()
+        return {
+            "dialect": "postgres",
+            "schema_sql": artifacts["schema"],
+            "seed_sql": artifacts["seed"],
+            "sample_queries_sql": artifacts["sample_queries"],
+        }
+
+    def load_starter_dwh(self, dwh_store_path: str | Path | None = None) -> dict[str, Any]:
+        repository = StarterDwhRepository(dwh_store_path or self._default_starter_dwh_path())
+        try:
+            return repository.load_seed_data().to_dict()
+        except StarterDwhError as exc:
+            raise KdafError(str(exc), code="starter_dwh_error") from exc
+
+    def starter_dwh_sample_facts(self, dwh_store_path: str | Path | None = None) -> dict[str, Any]:
+        repository = StarterDwhRepository(dwh_store_path or self._default_starter_dwh_path())
+        try:
+            return {
+                "budget_vs_actuals": repository.sample_budget_vs_actuals(),
+                "department_spend": repository.sample_department_spend(),
+            }
+        except StarterDwhError as exc:
+            raise KdafError(str(exc), code="starter_dwh_not_loaded") from exc
+
+    def _default_starter_dwh_path(self) -> Path:
+        return self.metadata.store_path.parent / "starter_dwh.sqlite3"
 
 
 def _safe_database_summary(database_config: Any) -> dict[str, Any]:

@@ -46,6 +46,26 @@ def build_parser() -> argparse.ArgumentParser:
     run_get = run_subparsers.add_parser("get", help="Read one run")
     run_get.add_argument("id")
 
+    starter_dwh = subparsers.add_parser("starter-dwh", help="Manage the FP&A starter DWH")
+    starter_dwh_subparsers = starter_dwh.add_subparsers(
+        dest="starter_dwh_command",
+        required=True,
+    )
+
+    starter_dwh_subparsers.add_parser("schema", help="Print starter DWH Postgres SQL artifacts")
+
+    starter_dwh_load = starter_dwh_subparsers.add_parser(
+        "load",
+        help="Load starter FP&A dimensions and facts into the local DWH store",
+    )
+    starter_dwh_load.add_argument("--dwh-store", type=Path)
+
+    starter_dwh_facts = starter_dwh_subparsers.add_parser(
+        "facts",
+        help="Run sample starter DWH queries",
+    )
+    starter_dwh_facts.add_argument("--dwh-store", type=Path)
+
     return parser
 
 
@@ -75,6 +95,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_project(core, args)
     if args.command == "run":
         return _dispatch_run(core, args)
+    if args.command == "starter-dwh":
+        return _dispatch_starter_dwh(core, args)
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -96,6 +118,16 @@ def _dispatch_run(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.run_command == "get":
         return core.get_run(args.id)
     raise KdafError(f"Unknown run command: {args.run_command}")
+
+
+def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.starter_dwh_command == "schema":
+        return core.starter_dwh_schema()
+    if args.starter_dwh_command == "load":
+        return core.load_starter_dwh(dwh_store_path=args.dwh_store)
+    if args.starter_dwh_command == "facts":
+        return core.starter_dwh_sample_facts(dwh_store_path=args.dwh_store)
+    raise KdafError(f"Unknown starter DWH command: {args.starter_dwh_command}")
 
 
 def _write_json(payload: Any, output: TextIO) -> None:

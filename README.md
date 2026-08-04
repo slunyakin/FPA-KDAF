@@ -99,6 +99,17 @@ kdaf --metadata-store .kdaf/v02-demo.sqlite3 run create <project-id>
 kdaf --metadata-store .kdaf/v02-demo.sqlite3 run get <run-id>
 ```
 
+Load the v0.3 FP&A starter DWH seed into a local DWH store:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-dwh load
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-dwh facts
+```
+
+The starter DWH includes Postgres SQL artifacts for the canonical schema, seed data, and sample
+queries. The CLI uses a dedicated local DWH store by default at `.kdaf/starter_dwh.sqlite3` so
+starter financial facts remain outside the metadata repository.
+
 Call the tool server with JSON-line requests:
 
 ```bash
@@ -106,6 +117,9 @@ printf '{"tool":"health","arguments":{}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"project.create","arguments":{"name":"Agent Project"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"starter_dwh.load","arguments":{}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 ```
 
@@ -153,5 +167,7 @@ pytest -m integration
 
 ## Project Status
 
-KDAF is in v0.2 agent/tooling scope: v0.1 local infrastructure, typed configuration, shared core
-APIs, project/run metadata persistence, a CLI shell, an MCP-style tool server, and parity tests.
+KDAF is moving from v0.2 agent/tooling scope into v0.3 FP&A starter-kit scope. The current public
+surface includes v0.1 local infrastructure, typed configuration, shared core APIs, project/run
+metadata persistence, a CLI shell, an MCP-style tool server, parity tests, and a starter FP&A DWH
+schema with seed data and sample finance queries.

@@ -17,6 +17,7 @@ from kdaf.metadata import (
     Run,
     package_metadata,
 )
+from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 
 __version__ = "0.2.0"
 __all__ = [
@@ -32,7 +33,10 @@ __all__ = [
     "Project",
     "RuntimeConfig",
     "Run",
+    "StarterDwhError",
+    "StarterDwhRepository",
     "__version__",
     "load_config",
     "package_metadata",
+    "starter_dwh_sql_artifacts",
 ]
