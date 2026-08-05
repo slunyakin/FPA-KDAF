@@ -23,7 +23,9 @@ classifiers = [
   "Topic :: Database",
   "Topic :: Office/Business :: Financial",
 ]
-dependencies = []
+dependencies = [
+  "neo4j>=5.25,<6",
+]
 
 [project.scripts]
 kdaf = "kdaf.cli:main"
