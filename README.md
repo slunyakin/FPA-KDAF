@@ -110,6 +110,26 @@ The starter DWH includes Postgres SQL artifacts for the canonical schema, seed d
 queries. The CLI uses a dedicated local DWH store by default at `.kdaf/starter_dwh.sqlite3` so
 starter financial facts remain outside the metadata repository.
 
+Load the v0.3 FP&A starter graph into Neo4j:
+
+```bash
+docker compose up -d --wait neo4j
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-graph load
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-graph inspect
+```
+
+Open Neo4j Browser at `http://localhost:7474` and inspect the seeded semantic context:
+
+```cypher
+MATCH path = (:FinanceDomain {id: 'domain:fpna_starter'})-[:HAS_CONCEPT]->(:SemanticConcept)
+RETURN path
+LIMIT 50;
+```
+
+The graph seed uses stable concept IDs such as `account:revenue`, `department:sales`, and
+`scenario:actual`. Concept nodes link to DWH dimensions through `REFERENCES_DWH_DIMENSION`; they do
+not duplicate financial fact rows in Neo4j.
+
 Call the tool server with JSON-line requests:
 
 ```bash
@@ -120,6 +140,9 @@ printf '{"tool":"project.create","arguments":{"name":"Agent Project"}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"starter_dwh.load","arguments":{}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"starter_graph.load","arguments":{}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 ```
 
@@ -167,7 +190,7 @@ pytest -m integration
 
 ## Project Status
 
-KDAF is moving from v0.2 agent/tooling scope into v0.3 FP&A starter-kit scope. The current public
-surface includes v0.1 local infrastructure, typed configuration, shared core APIs, project/run
-metadata persistence, a CLI shell, an MCP-style tool server, parity tests, and a starter FP&A DWH
-schema with seed data and sample finance queries.
+KDAF is moving through v0.3 FP&A starter-kit scope. The current public surface includes v0.1 local
+infrastructure, typed configuration, shared core APIs, project/run metadata persistence, a CLI shell,
+an MCP-style tool server, parity tests, a starter FP&A DWH schema with seed data and sample finance
+queries, and a Neo4j-backed starter semantic graph for finance concepts.

@@ -41,6 +41,8 @@ def test_readme_documents_v02_public_commands() -> None:
     assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 health" in readme
     assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 project create" in readme
     assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-dwh load" in readme
+    assert "kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-graph load" in readme
     assert "kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3" in readme
     assert '"tool":"health"' in readme
     assert '"tool":"starter_dwh.load"' in readme
+    assert '"tool":"starter_graph.load"' in readme

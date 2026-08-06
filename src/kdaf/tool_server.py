@@ -22,6 +22,9 @@ TOOL_NAMES = (
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
+    "starter_graph.schema",
+    "starter_graph.load",
+    "starter_graph.inspect",
 )
 
 
@@ -115,6 +118,12 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.load_starter_dwh(dwh_store_path=args.get("dwh_store_path"))
     if tool_name == "starter_dwh.facts":
         return core.starter_dwh_sample_facts(dwh_store_path=args.get("dwh_store_path"))
+    if tool_name == "starter_graph.schema":
+        return core.starter_graph_schema()
+    if tool_name == "starter_graph.load":
+        return core.load_starter_graph()
+    if tool_name == "starter_graph.inspect":
+        return core.starter_graph_context()
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 

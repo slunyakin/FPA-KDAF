@@ -66,6 +66,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     starter_dwh_facts.add_argument("--dwh-store", type=Path)
 
+    starter_graph = subparsers.add_parser("starter-graph", help="Manage the FP&A starter graph")
+    starter_graph_subparsers = starter_graph.add_subparsers(
+        dest="starter_graph_command",
+        required=True,
+    )
+
+    starter_graph_subparsers.add_parser("schema", help="Print starter graph Cypher artifacts")
+    starter_graph_subparsers.add_parser("load", help="Load starter FP&A concepts into Neo4j")
+    starter_graph_subparsers.add_parser("inspect", help="Inspect starter graph concept links")
+
     return parser
 
 
@@ -97,6 +107,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_run(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
+    if args.command == "starter-graph":
+        return _dispatch_starter_graph(core, args)
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -128,6 +140,16 @@ def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.starter_dwh_command == "facts":
         return core.starter_dwh_sample_facts(dwh_store_path=args.dwh_store)
     raise KdafError(f"Unknown starter DWH command: {args.starter_dwh_command}")
+
+
+def _dispatch_starter_graph(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.starter_graph_command == "schema":
+        return core.starter_graph_schema()
+    if args.starter_graph_command == "load":
+        return core.load_starter_graph()
+    if args.starter_graph_command == "inspect":
+        return core.starter_graph_context()
+    raise KdafError(f"Unknown starter graph command: {args.starter_graph_command}")
 
 
 def _write_json(payload: Any, output: TextIO) -> None:

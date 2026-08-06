@@ -9,6 +9,12 @@ from typing import Any
 from kdaf.config import KdafConfig, load_config
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
+from kdaf.starter_graph import (
+    Neo4jConnectionSettings,
+    StarterGraphError,
+    StarterGraphRepository,
+    starter_graph_cypher_artifacts,
+)
 
 
 class KdafError(ValueError):
@@ -128,6 +134,36 @@ class KdafCore:
 
     def _default_starter_dwh_path(self) -> Path:
         return self.metadata.store_path.parent / "starter_dwh.sqlite3"
+
+    def starter_graph_schema(self) -> dict[str, str]:
+        artifacts = starter_graph_cypher_artifacts()
+        return {
+            "dialect": "cypher",
+            "seed_cypher": artifacts["seed"],
+            "sample_queries_cypher": artifacts["sample_queries"],
+        }
+
+    def load_starter_graph(self) -> dict[str, Any]:
+        repository = StarterGraphRepository(self._neo4j_connection_settings())
+        try:
+            return repository.load_seed_data().to_dict()
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code="starter_graph_error") from exc
+
+    def starter_graph_context(self) -> dict[str, Any]:
+        repository = StarterGraphRepository(self._neo4j_connection_settings())
+        try:
+            return repository.inspect_context()
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code="starter_graph_not_loaded") from exc
+
+    def _neo4j_connection_settings(self) -> Neo4jConnectionSettings:
+        return Neo4jConnectionSettings(
+            uri=self.config.neo4j.uri,
+            user=self.config.neo4j.user,
+            password=self.config.neo4j.password,
+            database=self.config.neo4j.database,
+        )
 
 
 def _safe_database_summary(database_config: Any) -> dict[str, Any]:
