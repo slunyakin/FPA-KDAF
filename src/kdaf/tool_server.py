@@ -19,6 +19,14 @@ TOOL_NAMES = (
     "run.create",
     "run.list",
     "run.get",
+    "competency_question.create",
+    "competency_question.list",
+    "competency_question.get",
+    "mvg.create",
+    "mvg.list",
+    "mvg.get",
+    "mvg.add_question",
+    "mvg.add_concept",
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
@@ -112,6 +120,38 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.list_runs(project_id=args.get("project_id"))
     if tool_name == "run.get":
         return core.get_run(_required_arg(args, "id"))
+    if tool_name == "competency_question.create":
+        return core.create_competency_question(
+            project_id=_required_arg(args, "project_id"),
+            question_text=_required_arg(args, "question_text"),
+            business_context=args.get("business_context", ""),
+        )
+    if tool_name == "competency_question.list":
+        return core.list_competency_questions(project_id=args.get("project_id"))
+    if tool_name == "competency_question.get":
+        return core.get_competency_question(_required_arg(args, "id"))
+    if tool_name == "mvg.create":
+        return core.create_mvg_artifact(
+            project_id=_required_arg(args, "project_id"),
+            name=_required_arg(args, "name"),
+            description=args.get("description", ""),
+            question_ids=_optional_string_list_arg(args, "question_ids"),
+            concept_ids=_optional_string_list_arg(args, "concept_ids"),
+        )
+    if tool_name == "mvg.list":
+        return core.list_mvg_artifacts(project_id=args.get("project_id"))
+    if tool_name == "mvg.get":
+        return core.get_mvg_artifact(_required_arg(args, "id"))
+    if tool_name == "mvg.add_question":
+        return core.add_question_to_mvg(
+            mvg_id=_required_arg(args, "mvg_id"),
+            question_id=_required_arg(args, "question_id"),
+        )
+    if tool_name == "mvg.add_concept":
+        return core.add_concept_to_mvg(
+            mvg_id=_required_arg(args, "mvg_id"),
+            concept_id=_required_arg(args, "concept_id"),
+        )
     if tool_name == "starter_dwh.schema":
         return core.starter_dwh_schema()
     if tool_name == "starter_dwh.load":
@@ -145,6 +185,15 @@ def _required_arg(arguments: dict[str, Any], name: str) -> str:
     value = arguments.get(name)
     if not isinstance(value, str) or not value.strip():
         raise KdafError(f"Missing required argument: {name}", code="missing_argument")
+    return value
+
+
+def _optional_string_list_arg(arguments: dict[str, Any], name: str) -> list[str]:
+    value = arguments.get(name, [])
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise KdafError(f"Argument must be a list of strings: {name}", code="invalid_argument")
     return value
 
 
