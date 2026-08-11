@@ -51,6 +51,134 @@ def test_tool_server_created_project_is_visible_through_cli(tmp_path) -> None:
     assert json.loads(stdout.getvalue())["name"] == "Agent Project"
 
 
+def test_cli_manages_competency_questions_and_mvg_artifacts(tmp_path) -> None:
+    store = tmp_path / "metadata.sqlite3"
+    project_stdout = StringIO()
+    cli_main(
+        ["--metadata-store", str(store), "project", "create", "CLI Project"],
+        stdout=project_stdout,
+    )
+    project = json.loads(project_stdout.getvalue())
+
+    question_stdout = StringIO()
+    question_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(store),
+            "competency-question",
+            "create",
+            project["id"],
+            "Where is actual spend over budget this quarter?",
+            "--business-context",
+            "Monthly business review",
+        ],
+        stdout=question_stdout,
+    )
+    question = json.loads(question_stdout.getvalue())
+
+    mvg_stdout = StringIO()
+    mvg_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(store),
+            "mvg",
+            "create",
+            project["id"],
+            "Budget variance MVG",
+            "--description",
+            "Initial graph scope for variance analysis",
+            "--question-id",
+            question["id"],
+            "--concept-id",
+            "metric:budget_variance",
+            "--concept-id",
+            "department:sales",
+        ],
+        stdout=mvg_stdout,
+    )
+    mvg = json.loads(mvg_stdout.getvalue())
+
+    assert question_exit_code == 0
+    assert question["project_id"] == project["id"]
+    assert question["business_context"] == "Monthly business review"
+    assert mvg_exit_code == 0
+    assert mvg["question_ids"] == [question["id"]]
+    assert mvg["concept_ids"] == ["department:sales", "metric:budget_variance"]
+
+
+def test_tool_server_manages_competency_questions_and_mvg_artifacts(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    project = call_tool("project.create", {"name": "Agent Project"}, core)
+    question = call_tool(
+        "competency_question.create",
+        {
+            "project_id": project["id"],
+            "question_text": "Which departments are driving forecast variance?",
+        },
+        core,
+    )
+    followup_question = call_tool(
+        "competency_question.create",
+        {
+            "project_id": project["id"],
+            "question_text": "Which scenarios should be compared for the forecast review?",
+        },
+        core,
+    )
+
+    artifact = call_tool(
+        "mvg.create",
+        {
+            "project_id": project["id"],
+            "name": "Forecast variance MVG",
+            "question_ids": [question["id"]],
+            "concept_ids": ["metric:forecast_variance"],
+        },
+        core,
+    )
+    updated = call_tool(
+        "mvg.add_concept",
+        {"mvg_id": artifact["id"], "concept_id": "scenario:forecast"},
+        core,
+    )
+    updated = call_tool(
+        "mvg.add_question",
+        {"mvg_id": artifact["id"], "question_id": followup_question["id"]},
+        core,
+    )
+
+    assert call_tool("competency_question.get", {"id": question["id"]}, core) == question
+    assert call_tool("mvg.get", {"id": artifact["id"]}, core) == updated
+    assert call_tool("mvg.list", {"project_id": project["id"]}, core) == [updated]
+    assert set(updated["question_ids"]) == {question["id"], followup_question["id"]}
+    assert updated["concept_ids"] == ["metric:forecast_variance", "scenario:forecast"]
+
+
+def test_tool_server_rejects_invalid_mvg_list_arguments(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    project = call_tool("project.create", {"name": "Agent Project"}, core)
+
+    response = handle_message(
+        {
+            "tool": "mvg.create",
+            "arguments": {
+                "project_id": project["id"],
+                "name": "Invalid MVG",
+                "concept_ids": "metric:budget_variance",
+            },
+        },
+        core,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "invalid_argument",
+            "message": "Argument must be a list of strings: concept_ids",
+        },
+    }
+
+
 def test_cli_loads_starter_dwh_and_returns_sample_facts(tmp_path) -> None:
     metadata_store = tmp_path / "metadata.sqlite3"
     dwh_store = tmp_path / "starter_dwh.sqlite3"

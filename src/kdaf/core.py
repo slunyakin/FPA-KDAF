@@ -106,6 +106,82 @@ class KdafCore:
         except MetadataError as exc:
             raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
+    def create_competency_question(
+        self,
+        project_id: str,
+        question_text: str,
+        business_context: str = "",
+    ) -> dict[str, str]:
+        try:
+            return self.metadata.create_competency_question(
+                project_id=project_id,
+                question_text=question_text,
+                business_context=business_context,
+            ).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def list_competency_questions(
+        self,
+        project_id: str | None = None,
+    ) -> list[dict[str, str]]:
+        try:
+            return [
+                question.to_dict()
+                for question in self.metadata.list_competency_questions(project_id=project_id)
+            ]
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def get_competency_question(self, question_id: str) -> dict[str, str]:
+        try:
+            return self.metadata.get_competency_question(question_id).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def create_mvg_artifact(
+        self,
+        project_id: str,
+        name: str,
+        description: str = "",
+        question_ids: list[str] | None = None,
+        concept_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self.metadata.create_mvg_artifact(
+                project_id=project_id,
+                name=name,
+                description=description,
+                question_ids=question_ids,
+                concept_ids=concept_ids,
+            ).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def list_mvg_artifacts(self, project_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            return [artifact.to_dict() for artifact in self.metadata.list_mvg_artifacts(project_id)]
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def get_mvg_artifact(self, mvg_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.get_mvg_artifact(mvg_id).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def add_question_to_mvg(self, mvg_id: str, question_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.add_question_to_mvg(mvg_id, question_id).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def add_concept_to_mvg(self, mvg_id: str, concept_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.add_concept_to_mvg(mvg_id, concept_id).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
     def starter_dwh_schema(self) -> dict[str, str]:
         artifacts = starter_dwh_sql_artifacts()
         return {

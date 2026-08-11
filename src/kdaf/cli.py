@@ -46,6 +46,53 @@ def build_parser() -> argparse.ArgumentParser:
     run_get = run_subparsers.add_parser("get", help="Read one run")
     run_get.add_argument("id")
 
+    question = subparsers.add_parser("competency-question", help="Manage competency questions")
+    question_subparsers = question.add_subparsers(dest="question_command", required=True)
+
+    question_create = question_subparsers.add_parser(
+        "create",
+        help="Create a competency question for a project",
+    )
+    question_create.add_argument("project_id")
+    question_create.add_argument("question_text")
+    question_create.add_argument("--business-context", default="")
+
+    question_list = question_subparsers.add_parser("list", help="List competency questions")
+    question_list.add_argument("--project-id")
+
+    question_get = question_subparsers.add_parser("get", help="Read one competency question")
+    question_get.add_argument("id")
+
+    mvg = subparsers.add_parser("mvg", help="Manage minimum viable graph artifacts")
+    mvg_subparsers = mvg.add_subparsers(dest="mvg_command", required=True)
+
+    mvg_create = mvg_subparsers.add_parser("create", help="Create an MVG artifact")
+    mvg_create.add_argument("project_id")
+    mvg_create.add_argument("name")
+    mvg_create.add_argument("--description", default="")
+    mvg_create.add_argument("--question-id", action="append", default=[])
+    mvg_create.add_argument("--concept-id", action="append", default=[])
+
+    mvg_list = mvg_subparsers.add_parser("list", help="List MVG artifacts")
+    mvg_list.add_argument("--project-id")
+
+    mvg_get = mvg_subparsers.add_parser("get", help="Read one MVG artifact")
+    mvg_get.add_argument("id")
+
+    mvg_add_question = mvg_subparsers.add_parser(
+        "add-question",
+        help="Attach a source competency question to an MVG artifact",
+    )
+    mvg_add_question.add_argument("mvg_id")
+    mvg_add_question.add_argument("question_id")
+
+    mvg_add_concept = mvg_subparsers.add_parser(
+        "add-concept",
+        help="Attach an initial graph concept ID to an MVG artifact",
+    )
+    mvg_add_concept.add_argument("mvg_id")
+    mvg_add_concept.add_argument("concept_id")
+
     starter_dwh = subparsers.add_parser("starter-dwh", help="Manage the FP&A starter DWH")
     starter_dwh_subparsers = starter_dwh.add_subparsers(
         dest="starter_dwh_command",
@@ -105,6 +152,10 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_project(core, args)
     if args.command == "run":
         return _dispatch_run(core, args)
+    if args.command == "competency-question":
+        return _dispatch_competency_question(core, args)
+    if args.command == "mvg":
+        return _dispatch_mvg(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
     if args.command == "starter-graph":
@@ -130,6 +181,40 @@ def _dispatch_run(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.run_command == "get":
         return core.get_run(args.id)
     raise KdafError(f"Unknown run command: {args.run_command}")
+
+
+def _dispatch_competency_question(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.question_command == "create":
+        return core.create_competency_question(
+            project_id=args.project_id,
+            question_text=args.question_text,
+            business_context=args.business_context,
+        )
+    if args.question_command == "list":
+        return core.list_competency_questions(project_id=args.project_id)
+    if args.question_command == "get":
+        return core.get_competency_question(args.id)
+    raise KdafError(f"Unknown competency question command: {args.question_command}")
+
+
+def _dispatch_mvg(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.mvg_command == "create":
+        return core.create_mvg_artifact(
+            project_id=args.project_id,
+            name=args.name,
+            description=args.description,
+            question_ids=args.question_id,
+            concept_ids=args.concept_id,
+        )
+    if args.mvg_command == "list":
+        return core.list_mvg_artifacts(project_id=args.project_id)
+    if args.mvg_command == "get":
+        return core.get_mvg_artifact(args.id)
+    if args.mvg_command == "add-question":
+        return core.add_question_to_mvg(args.mvg_id, args.question_id)
+    if args.mvg_command == "add-concept":
+        return core.add_concept_to_mvg(args.mvg_id, args.concept_id)
+    raise KdafError(f"Unknown MVG command: {args.mvg_command}")
 
 
 def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:

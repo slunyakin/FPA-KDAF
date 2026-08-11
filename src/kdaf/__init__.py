@@ -10,8 +10,10 @@ from kdaf.config import (
 )
 from kdaf.core import KdafCore, KdafError
 from kdaf.metadata import (
+    CompetencyQuestion,
     MetadataError,
     MetadataRepository,
+    MvgArtifact,
     PackageMetadata,
     Project,
     Run,
@@ -28,12 +30,14 @@ from kdaf.starter_graph import (
 __version__ = "0.2.0"
 __all__ = [
     "ConfigError",
+    "CompetencyQuestion",
     "DatabaseConfig",
     "KdafCore",
     "KdafConfig",
     "KdafError",
     "MetadataError",
     "MetadataRepository",
+    "MvgArtifact",
     "Neo4jConfig",
     "Neo4jConnectionSettings",
     "PackageMetadata",

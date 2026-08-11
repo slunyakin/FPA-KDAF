@@ -99,6 +99,29 @@ kdaf --metadata-store .kdaf/v02-demo.sqlite3 run create <project-id>
 kdaf --metadata-store .kdaf/v02-demo.sqlite3 run get <run-id>
 ```
 
+Capture competency questions and use them to define a minimum viable graph (MVG) artifact:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 competency-question create \
+  <project-id> "Where is actual spend over budget this quarter?" \
+  --business-context "Monthly business review"
+
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 mvg create \
+  <project-id> "Budget variance MVG" \
+  --description "Initial graph scope for variance analysis" \
+  --question-id <question-id> \
+  --concept-id metric:budget_variance \
+  --concept-id department:sales
+
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 mvg get <mvg-id>
+```
+
+Competency questions are metadata inputs for designing the starter MVG. They solve the blank-canvas
+problem in the same spirit that business questions guide DWH model design. KDAF does not store
+competency questions as Neo4j nodes and does not create direct question-to-concept graph edges. The
+MVG artifact records source question IDs and starter concept IDs so extraction workflows can grow the
+knowledge graph from documents and domain material.
+
 Load the v0.3 FP&A starter DWH seed into a local DWH store:
 
 ```bash
@@ -137,6 +160,12 @@ printf '{"tool":"health","arguments":{}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"project.create","arguments":{"name":"Agent Project"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"competency_question.create","arguments":{"project_id":"<project-id>","question_text":"Where is actual spend over budget this quarter?"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"mvg.create","arguments":{"project_id":"<project-id>","name":"Budget variance MVG","question_ids":["<question-id>"],"concept_ids":["metric:budget_variance","department:sales"]}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"starter_dwh.load","arguments":{}}\n' \
