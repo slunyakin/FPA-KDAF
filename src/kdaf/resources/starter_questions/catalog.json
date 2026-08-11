@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "catalog_id": "starter_question_catalog:fpna_v1",
+  "name": "FP&A Starter Question Catalog",
+  "description": "Canonical FP&A questions used to seed competency questions, MVG artifacts, demos, and future evaluations.",
+  "questions": [
+    {
+      "id": "starter_question:budget_vs_actuals",
+      "category": "budget_vs_actuals",
+      "question_text": "Where is actual revenue above or below budget by month?",
+      "business_context": "Monthly budget-to-actual review for revenue performance.",
+      "expected_data_dependencies": [
+        "fpna_facts.amount",
+        "fpna_periods.period_id",
+        "fpna_accounts.account_id:revenue",
+        "fpna_scenarios.scenario_id:actual",
+        "fpna_scenarios.scenario_id:budget"
+      ],
+      "expected_graph_concepts": [
+        "metric:budget_vs_actuals",
+        "metric:variance",
+        "account:revenue",
+        "scenario:actual",
+        "scenario:budget"
+      ]
+    },
+    {
+      "id": "starter_question:forecast_movement",
+      "category": "forecast_movement",
+      "question_text": "How has the revenue forecast moved compared with actuals?",
+      "business_context": "Forecast review focused on whether the latest outlook tracks actual performance.",
+      "expected_data_dependencies": [
+        "fpna_facts.amount",
+        "fpna_periods.period_id",
+        "fpna_accounts.account_id:revenue",
+        "fpna_scenarios.scenario_id:actual",
+        "fpna_scenarios.scenario_id:forecast"
+      ],
+      "expected_graph_concepts": [
+        "metric:forecast_movement",
+        "account:revenue",
+        "scenario:actual",
+        "scenario:forecast"
+      ]
+    },
+    {
+      "id": "starter_question:department_spend",
+      "category": "department_spend",
+      "question_text": "Which departments are driving operating expense spend this month?",
+      "business_context": "Department-level operating expense review for controllable spend.",
+      "expected_data_dependencies": [
+        "fpna_facts.amount",
+        "fpna_periods.period_id",
+        "fpna_departments.department_id",
+        "fpna_accounts.statement_section:operating_expense",
+        "fpna_scenarios.scenario_id:actual"
+      ],
+      "expected_graph_concepts": [
+        "metric:department_spend",
+        "account:payroll",
+        "account:cloud_hosting",
+        "account:marketing_spend",
+        "department:sales",
+        "department:marketing",
+        "department:engineering",
+        "department:g_and_a",
+        "scenario:actual"
+      ]
+    },
+    {
+      "id": "starter_question:revenue_driver",
+      "category": "revenue_driver",
+      "question_text": "What starter drivers should explain revenue performance?",
+      "business_context": "Early driver analysis that links revenue outcomes to operational context.",
+      "expected_data_dependencies": [
+        "fpna_facts.amount",
+        "fpna_accounts.account_id:revenue",
+        "fpna_accounts.account_id:headcount",
+        "fpna_scenarios.scenario_id:actual"
+      ],
+      "expected_graph_concepts": [
+        "metric:revenue_driver",
+        "account:revenue",
+        "account:headcount",
+        "scenario:actual"
+      ]
+    },
+    {
+      "id": "starter_question:variance",
+      "category": "variance",
+      "question_text": "Which accounts or departments have the largest actual-to-budget variance?",
+      "business_context": "Variance triage for prioritizing finance review and follow-up analysis.",
+      "expected_data_dependencies": [
+        "fpna_facts.amount",
+        "fpna_departments.department_id",
+        "fpna_accounts.account_id",
+        "fpna_scenarios.scenario_id:actual",
+        "fpna_scenarios.scenario_id:budget"
+      ],
+      "expected_graph_concepts": [
+        "metric:variance",
+        "metric:budget_vs_actuals",
+        "metric:department_spend",
+        "scenario:actual",
+        "scenario:budget"
+      ]
+    }
+  ]
+}

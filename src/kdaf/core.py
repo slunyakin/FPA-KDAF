@@ -15,6 +15,11 @@ from kdaf.starter_graph import (
     StarterGraphRepository,
     starter_graph_cypher_artifacts,
 )
+from kdaf.starter_questions import (
+    StarterQuestionCatalogError,
+    load_starter_question_catalog,
+    starter_question_catalog,
+)
 
 
 class KdafError(ValueError):
@@ -232,6 +237,20 @@ class KdafCore:
             return repository.inspect_context()
         except StarterGraphError as exc:
             raise KdafError(str(exc), code="starter_graph_not_loaded") from exc
+
+    def starter_question_catalog(self) -> dict[str, Any]:
+        try:
+            return starter_question_catalog().to_dict()
+        except StarterQuestionCatalogError as exc:
+            raise KdafError(str(exc), code="starter_question_catalog_error") from exc
+
+    def load_starter_questions(self, project_id: str) -> dict[str, Any]:
+        try:
+            return load_starter_question_catalog(self.metadata, project_id=project_id).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+        except StarterQuestionCatalogError as exc:
+            raise KdafError(str(exc), code="starter_question_catalog_error") from exc
 
     def _neo4j_connection_settings(self) -> Neo4jConnectionSettings:
         return Neo4jConnectionSettings(

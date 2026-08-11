@@ -123,6 +123,22 @@ def build_parser() -> argparse.ArgumentParser:
     starter_graph_subparsers.add_parser("load", help="Load starter FP&A concepts into Neo4j")
     starter_graph_subparsers.add_parser("inspect", help="Inspect starter graph concept links")
 
+    starter_questions = subparsers.add_parser(
+        "starter-questions",
+        help="Manage the FP&A starter question catalog",
+    )
+    starter_questions_subparsers = starter_questions.add_subparsers(
+        dest="starter_questions_command",
+        required=True,
+    )
+    starter_questions_subparsers.add_parser("catalog", help="Print starter FP&A questions")
+
+    starter_questions_load = starter_questions_subparsers.add_parser(
+        "load",
+        help="Load starter questions and MVG artifacts into project metadata",
+    )
+    starter_questions_load.add_argument("project_id")
+
     return parser
 
 
@@ -160,6 +176,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_starter_dwh(core, args)
     if args.command == "starter-graph":
         return _dispatch_starter_graph(core, args)
+    if args.command == "starter-questions":
+        return _dispatch_starter_questions(core, args)
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -235,6 +253,14 @@ def _dispatch_starter_graph(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.starter_graph_command == "inspect":
         return core.starter_graph_context()
     raise KdafError(f"Unknown starter graph command: {args.starter_graph_command}")
+
+
+def _dispatch_starter_questions(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.starter_questions_command == "catalog":
+        return core.starter_question_catalog()
+    if args.starter_questions_command == "load":
+        return core.load_starter_questions(project_id=args.project_id)
+    raise KdafError(f"Unknown starter questions command: {args.starter_questions_command}")
 
 
 def _write_json(payload: Any, output: TextIO) -> None:
