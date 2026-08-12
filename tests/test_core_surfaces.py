@@ -5,7 +5,7 @@ from io import StringIO
 
 from kdaf.cli import main as cli_main
 from kdaf.core import KdafCore
-from kdaf.tool_server import call_tool, handle_message, serve
+from kdaf.tool_server import call_tool, handle_message, list_tools, serve
 
 
 def test_core_health_and_config_summary_do_not_expose_secrets(tmp_path) -> None:
@@ -256,6 +256,121 @@ def test_tool_server_starter_question_load_invalid_project_returns_structured_er
     assert response == {
         "ok": False,
         "error": {"code": "not_found", "message": "Project not found: missing-project"},
+    }
+
+
+def test_cli_loads_full_starter_kit_without_graph_for_offline_use(tmp_path) -> None:
+    store = tmp_path / "metadata.sqlite3"
+    dwh_store = tmp_path / "starter_dwh.sqlite3"
+    project_stdout = StringIO()
+    cli_main(
+        ["--metadata-store", str(store), "project", "create", "CLI Project"],
+        stdout=project_stdout,
+    )
+    project = json.loads(project_stdout.getvalue())
+
+    load_stdout = StringIO()
+    load_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(store),
+            "starter-kit",
+            "load",
+            project["id"],
+            "--dwh-store",
+            str(dwh_store),
+            "--skip-graph",
+        ],
+        stdout=load_stdout,
+    )
+    second_load_stdout = StringIO()
+    second_load_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(store),
+            "starter-kit",
+            "load",
+            project["id"],
+            "--dwh-store",
+            str(dwh_store),
+            "--skip-graph",
+        ],
+        stdout=second_load_stdout,
+    )
+
+    summary = json.loads(load_stdout.getvalue())
+    second_summary = json.loads(second_load_stdout.getvalue())
+
+    assert load_exit_code == 0
+    assert second_load_exit_code == 0
+    assert summary["status"] == "loaded"
+    assert summary["already_loaded"] is False
+    assert summary["dwh"]["row_counts"]["fpna_facts"] == 24
+    assert summary["graph"] == {"reason": "Graph load was skipped by request", "skipped": True}
+    assert summary["questions"]["question_count"] == 5
+    assert second_summary["status"] == "already_loaded"
+    assert second_summary["already_loaded"] is True
+    assert "clean the local stores and load again" in second_summary["message"]
+
+
+def test_tool_server_loads_full_starter_kit_without_graph_for_offline_use(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    project = call_tool("project.create", {"name": "Agent Project"}, core)
+    dwh_store = tmp_path / "starter_dwh.sqlite3"
+
+    summary = call_tool(
+        "starter_kit.load",
+        {
+            "project_id": project["id"],
+            "dwh_store_path": str(dwh_store),
+            "include_graph": False,
+        },
+        core,
+    )
+
+    assert {"name": "starter_kit.load"} in list_tools()
+    assert summary["project_id"] == project["id"]
+    assert summary["status"] == "loaded"
+    assert summary["dwh"]["row_counts"]["fpna_facts"] == 24
+    assert summary["graph"]["skipped"] is True
+    assert summary["questions"]["mvg_count"] == 5
+
+
+def test_tool_server_starter_kit_load_invalid_project_returns_structured_error(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message(
+        {
+            "tool": "starter_kit.load",
+            "arguments": {"project_id": "missing-project", "include_graph": False},
+        },
+        core,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {"code": "not_found", "message": "Project not found: missing-project"},
+    }
+
+
+def test_tool_server_starter_kit_load_rejects_invalid_include_graph(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    project = call_tool("project.create", {"name": "Agent Project"}, core)
+
+    response = handle_message(
+        {
+            "tool": "starter_kit.load",
+            "arguments": {"project_id": project["id"], "include_graph": "false"},
+        },
+        core,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "invalid_argument",
+            "message": "Argument must be a boolean: include_graph",
+        },
     }
 
 

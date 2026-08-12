@@ -35,6 +35,7 @@ TOOL_NAMES = (
     "starter_graph.inspect",
     "starter_questions.catalog",
     "starter_questions.load",
+    "starter_kit.load",
 )
 
 
@@ -170,6 +171,12 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.starter_question_catalog()
     if tool_name == "starter_questions.load":
         return core.load_starter_questions(project_id=_required_arg(args, "project_id"))
+    if tool_name == "starter_kit.load":
+        return core.load_starter_kit(
+            project_id=_required_arg(args, "project_id"),
+            dwh_store_path=args.get("dwh_store_path"),
+            include_graph=_optional_bool_arg(args, "include_graph", default=True),
+        )
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 
@@ -200,6 +207,13 @@ def _optional_string_list_arg(arguments: dict[str, Any], name: str) -> list[str]
         return []
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise KdafError(f"Argument must be a list of strings: {name}", code="invalid_argument")
+    return value
+
+
+def _optional_bool_arg(arguments: dict[str, Any], name: str, default: bool) -> bool:
+    value = arguments.get(name, default)
+    if not isinstance(value, bool):
+        raise KdafError(f"Argument must be a boolean: {name}", code="invalid_argument")
     return value
 
 

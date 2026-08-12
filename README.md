@@ -101,6 +101,17 @@ kdaf --metadata-store .kdaf/v02-demo.sqlite3 run create <project-id>
 kdaf --metadata-store .kdaf/v02-demo.sqlite3 run get <run-id>
 ```
 
+Load the full v0.3 FP&A starter kit for a project:
+
+```bash
+docker compose up -d --wait neo4j
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-kit load <project-id>
+```
+
+This single command loads the starter DWH seed, starter Neo4j graph concepts, starter competency
+questions, and MVG artifacts. Repeated loads return `status: "already_loaded"` for the project and
+refresh the idempotent starter stores. Use `--skip-graph` when running offline without Neo4j.
+
 Capture competency questions and use them to define a minimum viable graph (MVG) artifact:
 
 ```bash
@@ -187,6 +198,9 @@ printf '{"tool":"starter_questions.catalog","arguments":{}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"starter_questions.load","arguments":{"project_id":"<project-id>"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"starter_kit.load","arguments":{"project_id":"<project-id>"}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"starter_dwh.load","arguments":{}}\n' \

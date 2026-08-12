@@ -85,7 +85,37 @@ List projects:
 kdaf --metadata-store .kdaf/demo.sqlite3 project list
 ```
 
+## Load the Starter Kit
+
+The fastest path is to load the full starter kit into your project:
+
+```bash
+kdaf --metadata-store .kdaf/demo.sqlite3 starter-kit load <project-id>
+```
+
+This command loads:
+
+- starter DWH dimensions and facts
+- starter Neo4j graph concepts
+- starter competency questions
+- starter MVG artifacts
+
+Expected result: a single JSON summary with `dwh`, `graph`, and `questions` sections.
+
+If you are working without Neo4j, skip the graph layer explicitly:
+
+```bash
+kdaf --metadata-store .kdaf/demo.sqlite3 starter-kit load <project-id> --skip-graph
+```
+
+Repeated loads are idempotent. If the starter questions and MVGs already exist for the project,
+KDAF returns `status: "already_loaded"` and tells you to clean the local stores before rebuilding
+from scratch.
+
 ## Load Starter DWH Data
+
+The full starter-kit command already loads this layer. Use these commands when you want to work with
+the DWH layer directly.
 
 Load the starter FP&A data warehouse seed:
 
@@ -111,6 +141,9 @@ This is intentionally warehouse data. KDAF does not put financial facts or time 
 Neo4j.
 
 ## Load Starter Graph Concepts
+
+The full starter-kit command already loads this layer unless you pass `--skip-graph`. Use these
+commands when you want to work with the graph layer directly.
 
 Load the FP&A starter graph into Neo4j:
 
@@ -187,6 +220,9 @@ we care about first?” It does not claim the graph is complete.
 
 ## Use the Starter Question Catalog
 
+The full starter-kit command already loads this catalog into project metadata. Use these commands
+when you want to inspect or load the question layer directly.
+
 Inspect the packaged starter catalog:
 
 ```bash
@@ -226,6 +262,20 @@ Load starter questions:
 
 ```bash
 printf '{"tool":"starter_questions.load","arguments":{"project_id":"<project-id>"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/demo.sqlite3
+```
+
+Load the full starter kit:
+
+```bash
+printf '{"tool":"starter_kit.load","arguments":{"project_id":"<project-id>"}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/demo.sqlite3
+```
+
+Skip graph loading through the tool server:
+
+```bash
+printf '{"tool":"starter_kit.load","arguments":{"project_id":"<project-id>","include_graph":false}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/demo.sqlite3
 ```
 
