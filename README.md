@@ -112,6 +112,17 @@ This single command loads the starter DWH seed, starter Neo4j graph concepts, st
 questions, and MVG artifacts. Repeated loads return `status: "already_loaded"` for the project and
 refresh the idempotent starter stores. Use `--skip-graph` when running offline without Neo4j.
 
+Run the complete starter-kit demo sequence:
+
+```bash
+python scripts/run_starter_kit_demo.py \
+  --metadata-store .kdaf/demo.sqlite3 \
+  --dwh-store .kdaf/starter_dwh.sqlite3
+```
+
+The demo creates a project, loads the starter kit, runs starter DWH queries, lists starter questions
+and MVGs, and inspects graph context. Add `--skip-graph` when Neo4j is not running.
+
 Capture competency questions and use them to define a minimum viable graph (MVG) artifact:
 
 ```bash

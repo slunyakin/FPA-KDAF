@@ -112,6 +112,37 @@ Repeated loads are idempotent. If the starter questions and MVGs already exist f
 KDAF returns `status: "already_loaded"` and tells you to clean the local stores before rebuilding
 from scratch.
 
+## Run the Demo Script
+
+Use the demo script when you want one command that proves the starter vertical slice works:
+
+```bash
+python scripts/run_starter_kit_demo.py \
+  --metadata-store .kdaf/demo.sqlite3 \
+  --dwh-store .kdaf/starter_dwh.sqlite3
+```
+
+The demo script:
+
+- creates a project
+- loads the starter kit
+- runs DWH sample facts
+- lists starter competency questions
+- lists MVG artifacts
+- inspects graph context
+
+Expected result: `{"ok": true, "result": ...}` with project, starter-kit, DWH, question, MVG, and
+graph sections.
+
+If Neo4j is not running, use:
+
+```bash
+python scripts/run_starter_kit_demo.py \
+  --metadata-store .kdaf/demo.sqlite3 \
+  --dwh-store .kdaf/starter_dwh.sqlite3 \
+  --skip-graph
+```
+
 ## Load Starter DWH Data
 
 The full starter-kit command already loads this layer. Use these commands when you want to work with
