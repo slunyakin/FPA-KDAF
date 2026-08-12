@@ -45,7 +45,9 @@ KDAF starts as a local-first framework. The default Docker Compose stack is suit
 
 ## Quick Start
 
-For a guided consumer walkthrough, see [docs/user-guide.md](docs/user-guide.md).
+For a guided consumer walkthrough, see [docs/user-guide.md](docs/user-guide.md). For an explanation
+of the value and workflow for analysts, finance leaders, engineers, developers, auditors, and
+operators, see [the role-based consumer guide](docs/role-based-consumer-guide.md).
 
 Create and activate a virtual environment, then install developer dependencies:
 
@@ -282,6 +284,54 @@ printf '%s\n' \
 See [the v0.4 lifecycle contract](docs/provenance-validation-contract-v0.4.md) for fields, state
 transitions, audit expectations, and storage-boundary details.
 
+## v0.5 DWH-Aware CARP and Grounded Answers
+
+v0.5 joins the starter competency questions to semantic context and warehouse facts without
+blurring storage ownership. Load a project, its starter questions, and its separate DWH, then create
+a run. Use the returned budget-vs-actual competency-question ID and run ID below:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 dwh query budget_vs_actuals
+
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  carp retrieve <question-id>
+
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 \
+  evidence build <question-id> <run-id>
+```
+
+`carp retrieve` uses Neo4j by default. Pass `--offline-graph` only for the bundled local demo; it
+reads the same semantic seed model used to populate Neo4j. Evidence packets include addressable DWH
+rows, graph nodes and relationships, provenance links, validation decisions, question/project/run
+IDs, and build metadata.
+
+Generate an answer from a saved evidence packet:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  answer generate evidence.json
+```
+
+The default deterministic provider makes the demo repeatable without network access. Use
+`--provider ollama --model <model>` for local Ollama, or `--provider openai-compatible --base-url
+<url> --model <model>` for a compatible endpoint. KDAF accepts an answer as grounded only when all
+citations resolve to entries in the supplied packet; otherwise it returns
+`insufficiently_supported`.
+
+Run the complete public vertical slice, including an explicit unsupported-claim refusal:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 \
+  grounded-demo <question-id> <run-id> --offline-graph
+```
+
+Agent equivalents are `dwh.query`, `carp.retrieve`, `evidence.build`, `answer.generate`, and
+`grounded_answer.demo`. See [the v0.5 contract](docs/carp-retrieval-contract-v0.5.md) for schemas,
+error behavior, audit fields, provider rules, and the DWH/graph boundary.
+
 ## Local Services
 
 Copy `.env.example` if you want to customize ports or credentials:
@@ -322,8 +372,7 @@ pytest -m integration
 
 ## Project Status
 
-KDAF v0.4 adds a CSV source registry and extractor, cross-store provenance, an auditable expert
-validation queue, CLI/tool parity, and a runnable extraction-to-validation slice. The public surface
-also retains the v0.1 local infrastructure, v0.2 shared APIs, and the complete v0.3 starter kit:
-starter DWH, competency questions, MVG artifacts, starter question catalog, Neo4j semantic graph,
-and end-to-end starter-kit loader and demo.
+KDAF v0.5 adds controlled read-only DWH queries, CARP semantic retrieval, evidence packets,
+Ollama/OpenAI-compatible grounded answer generation, citation validation, prompt/output auditing,
+and a runnable question-to-cited-answer slice. It retains the v0.3 starter kit and v0.4 CSV
+extraction, provenance, and expert-validation workflows.
