@@ -4,6 +4,9 @@ This guide covers the v0.3 FP&A starter kit, v0.4 extraction and validation, and
 retrieval and grounded answers. KDAF now supports model design, governed ingestion, and auditable
 question-to-answer workflows while keeping semantic context separate from financial facts.
 
+For a view organized around consumer responsibilities and outcomes, see
+[How KDAF Helps Each Role](role-based-consumer-guide.md).
+
 ## v0.3 and v0.4 at a Glance
 
 v0.4 builds on v0.3; it does not replace it.
