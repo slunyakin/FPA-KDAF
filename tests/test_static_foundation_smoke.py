@@ -67,3 +67,18 @@ def test_v04_contract_and_demo_are_published() -> None:
     ):
         assert requirement in contract
     assert sample.startswith("entity,department,account,period,scenario,amount")
+
+
+@pytest.mark.smoke
+def test_user_guide_distinguishes_v03_and_v04_workflows() -> None:
+    guide = Path("docs/user-guide.md").read_text(encoding="utf-8")
+
+    assert "## v0.3 and v0.4 at a Glance" in guide
+    assert "Use v0.3 by itself" in guide
+    assert "Use v0.4 by itself" in guide
+    assert "Use them together" in guide
+    assert "## Register and Extract a CSV with v0.4" in guide
+    assert "## Use v0.3 and v0.4 Together" in guide
+    assert "source extract <source-id>" in guide
+    assert "validation approve <validation-id>" in guide
+    assert "document ingestion or extraction from real FP&A files" not in guide
