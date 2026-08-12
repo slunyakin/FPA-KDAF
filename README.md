@@ -39,6 +39,8 @@ KDAF starts as a local-first framework. The default Docker Compose stack is suit
 
 ## Quick Start
 
+For a guided consumer walkthrough, see [docs/user-guide.md](docs/user-guide.md).
+
 Create and activate a virtual environment, then install developer dependencies:
 
 ```bash
