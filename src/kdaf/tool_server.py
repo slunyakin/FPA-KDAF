@@ -33,6 +33,8 @@ TOOL_NAMES = (
     "starter_graph.schema",
     "starter_graph.load",
     "starter_graph.inspect",
+    "starter_questions.catalog",
+    "starter_questions.load",
 )
 
 
@@ -164,6 +166,10 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.load_starter_graph()
     if tool_name == "starter_graph.inspect":
         return core.starter_graph_context()
+    if tool_name == "starter_questions.catalog":
+        return core.starter_question_catalog()
+    if tool_name == "starter_questions.load":
+        return core.load_starter_questions(project_id=_required_arg(args, "project_id"))
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 

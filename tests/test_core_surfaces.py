@@ -179,6 +179,86 @@ def test_tool_server_rejects_invalid_mvg_list_arguments(tmp_path) -> None:
     }
 
 
+def test_cli_loads_starter_question_catalog_into_project_metadata(tmp_path) -> None:
+    store = tmp_path / "metadata.sqlite3"
+    project_stdout = StringIO()
+    cli_main(
+        ["--metadata-store", str(store), "project", "create", "CLI Project"],
+        stdout=project_stdout,
+    )
+    project = json.loads(project_stdout.getvalue())
+
+    catalog_stdout = StringIO()
+    catalog_exit_code = cli_main(
+        ["--metadata-store", str(store), "starter-questions", "catalog"],
+        stdout=catalog_stdout,
+    )
+    load_stdout = StringIO()
+    load_exit_code = cli_main(
+        [
+            "--metadata-store",
+            str(store),
+            "starter-questions",
+            "load",
+            project["id"],
+        ],
+        stdout=load_stdout,
+    )
+
+    catalog = json.loads(catalog_stdout.getvalue())
+    summary = json.loads(load_stdout.getvalue())
+
+    assert catalog_exit_code == 0
+    assert load_exit_code == 0
+    assert catalog["catalog_id"] == "starter_question_catalog:fpna_v1"
+    assert len(catalog["questions"]) == 5
+    assert summary["project_id"] == project["id"]
+    assert summary["question_count"] == 5
+    assert summary["mvg_count"] == 5
+    assert summary["created_question_count"] == 5
+
+
+def test_tool_server_loads_starter_question_catalog_into_project_metadata(tmp_path) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+    project = call_tool("project.create", {"name": "Agent Project"}, core)
+
+    catalog = call_tool("starter_questions.catalog", {}, core)
+    summary = call_tool(
+        "starter_questions.load",
+        {"project_id": project["id"]},
+        core,
+    )
+    second_summary = call_tool(
+        "starter_questions.load",
+        {"project_id": project["id"]},
+        core,
+    )
+
+    assert catalog["schema_version"] == 1
+    assert len(catalog["questions"]) == 5
+    assert summary["question_count"] == 5
+    assert summary["mvg_count"] == 5
+    assert summary["created_question_count"] == 5
+    assert second_summary["created_question_count"] == 0
+    assert second_summary["created_mvg_count"] == 0
+
+
+def test_tool_server_starter_question_load_invalid_project_returns_structured_error(
+    tmp_path,
+) -> None:
+    core = KdafCore(metadata_store_path=tmp_path / "metadata.sqlite3")
+
+    response = handle_message(
+        {"tool": "starter_questions.load", "arguments": {"project_id": "missing-project"}},
+        core,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {"code": "not_found", "message": "Project not found: missing-project"},
+    }
+
+
 def test_cli_loads_starter_dwh_and_returns_sample_facts(tmp_path) -> None:
     metadata_store = tmp_path / "metadata.sqlite3"
     dwh_store = tmp_path / "starter_dwh.sqlite3"

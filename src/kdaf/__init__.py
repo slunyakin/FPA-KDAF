@@ -26,6 +26,13 @@ from kdaf.starter_graph import (
     StarterGraphRepository,
     starter_graph_cypher_artifacts,
 )
+from kdaf.starter_questions import (
+    StarterQuestion,
+    StarterQuestionCatalog,
+    StarterQuestionCatalogError,
+    StarterQuestionLoadSummary,
+    starter_question_catalog,
+)
 
 __version__ = "0.2.0"
 __all__ = [
@@ -48,9 +55,14 @@ __all__ = [
     "StarterDwhRepository",
     "StarterGraphError",
     "StarterGraphRepository",
+    "StarterQuestion",
+    "StarterQuestionCatalog",
+    "StarterQuestionCatalogError",
+    "StarterQuestionLoadSummary",
     "__version__",
     "load_config",
     "package_metadata",
+    "starter_question_catalog",
     "starter_graph_cypher_artifacts",
     "starter_dwh_sql_artifacts",
 ]

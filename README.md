@@ -39,6 +39,8 @@ KDAF starts as a local-first framework. The default Docker Compose stack is suit
 
 ## Quick Start
 
+For a guided consumer walkthrough, see [docs/user-guide.md](docs/user-guide.md).
+
 Create and activate a virtual environment, then install developer dependencies:
 
 ```bash
@@ -122,6 +124,19 @@ competency questions as Neo4j nodes and does not create direct question-to-conce
 MVG artifact records source question IDs and starter concept IDs so extraction workflows can grow the
 knowledge graph from documents and domain material.
 
+Inspect and load the canonical starter question catalog:
+
+```bash
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-questions catalog
+kdaf --metadata-store .kdaf/v02-demo.sqlite3 starter-questions load <project-id>
+```
+
+The starter catalog includes canonical budget-vs-actuals, forecast movement, department spend,
+revenue driver, and variance questions. Each catalog entry includes the expected DWH dependencies
+and expected graph concept IDs. Loading the catalog creates project competency-question metadata and
+MVG artifacts, and it is repeatable: existing starter questions and MVGs are reused instead of
+duplicated.
+
 Load the v0.3 FP&A starter DWH seed into a local DWH store:
 
 ```bash
@@ -166,6 +181,12 @@ printf '{"tool":"competency_question.create","arguments":{"project_id":"<project
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"mvg.create","arguments":{"project_id":"<project-id>","name":"Budget variance MVG","question_ids":["<question-id>"],"concept_ids":["metric:budget_variance","department:sales"]}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"starter_questions.catalog","arguments":{}}\n' \
+  | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
+
+printf '{"tool":"starter_questions.load","arguments":{"project_id":"<project-id>"}}\n' \
   | kdaf-tool-server --metadata-store .kdaf/v02-demo.sqlite3
 
 printf '{"tool":"starter_dwh.load","arguments":{}}\n' \
