@@ -15,6 +15,7 @@ from kdaf.starter_graph import (
     StarterGraphRepository,
     starter_graph_cypher_artifacts,
 )
+from kdaf.starter_kit import StarterKitService
 from kdaf.starter_questions import (
     StarterQuestionCatalogError,
     load_starter_question_catalog,
@@ -249,6 +250,32 @@ class KdafCore:
             return load_starter_question_catalog(self.metadata, project_id=project_id).to_dict()
         except MetadataError as exc:
             raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+        except StarterQuestionCatalogError as exc:
+            raise KdafError(str(exc), code="starter_question_catalog_error") from exc
+
+    def load_starter_kit(
+        self,
+        project_id: str,
+        dwh_store_path: str | Path | None = None,
+        include_graph: bool = True,
+    ) -> dict[str, Any]:
+        service = StarterKitService(
+            metadata_repository=self.metadata,
+            graph_settings=self._neo4j_connection_settings(),
+            default_dwh_store_path=self._default_starter_dwh_path(),
+        )
+        try:
+            return service.load(
+                project_id=project_id,
+                dwh_store_path=dwh_store_path,
+                include_graph=include_graph,
+            ).to_dict()
+        except MetadataError as exc:
+            raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+        except StarterDwhError as exc:
+            raise KdafError(str(exc), code="starter_dwh_error") from exc
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code="starter_graph_error") from exc
         except StarterQuestionCatalogError as exc:
             raise KdafError(str(exc), code="starter_question_catalog_error") from exc
 

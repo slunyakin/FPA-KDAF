@@ -139,6 +139,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     starter_questions_load.add_argument("project_id")
 
+    starter_kit = subparsers.add_parser("starter-kit", help="Manage the full FP&A starter kit")
+    starter_kit_subparsers = starter_kit.add_subparsers(
+        dest="starter_kit_command",
+        required=True,
+    )
+
+    starter_kit_load = starter_kit_subparsers.add_parser(
+        "load",
+        help="Load starter DWH, graph, questions, and MVG artifacts",
+    )
+    starter_kit_load.add_argument("project_id")
+    starter_kit_load.add_argument("--dwh-store", type=Path)
+    starter_kit_load.add_argument(
+        "--skip-graph",
+        action="store_true",
+        help="Skip Neo4j graph loading for offline or test environments",
+    )
+
     return parser
 
 
@@ -178,6 +196,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_starter_graph(core, args)
     if args.command == "starter-questions":
         return _dispatch_starter_questions(core, args)
+    if args.command == "starter-kit":
+        return _dispatch_starter_kit(core, args)
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -261,6 +281,16 @@ def _dispatch_starter_questions(core: KdafCore, args: argparse.Namespace) -> Any
     if args.starter_questions_command == "load":
         return core.load_starter_questions(project_id=args.project_id)
     raise KdafError(f"Unknown starter questions command: {args.starter_questions_command}")
+
+
+def _dispatch_starter_kit(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.starter_kit_command == "load":
+        return core.load_starter_kit(
+            project_id=args.project_id,
+            dwh_store_path=args.dwh_store,
+            include_graph=not args.skip_graph,
+        )
+    raise KdafError(f"Unknown starter kit command: {args.starter_kit_command}")
 
 
 def _write_json(payload: Any, output: TextIO) -> None:
