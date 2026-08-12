@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from kdaf.config import KdafConfig, load_config
+from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
+from kdaf.graph import GraphError, GraphProvenanceRepository
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
@@ -24,7 +26,7 @@ from kdaf.starter_questions import (
 
 
 class KdafError(ValueError):
-    """Stable v0.2 application error for operator and agent surfaces."""
+    """Stable application error for operator and agent surfaces."""
 
     def __init__(self, message: str, code: str = "kdaf_error") -> None:
         super().__init__(message)
@@ -50,6 +52,8 @@ class KdafCore:
         config: KdafConfig | None = None,
         config_path: str | Path | None = None,
         metadata_store_path: str | Path | None = None,
+        dwh_store_path: str | Path | None = None,
+        graph_store_path: str | Path | None = None,
     ) -> None:
         if config is not None and config_path is not None:
             raise KdafError("config and config_path cannot both be provided")
@@ -58,6 +62,13 @@ class KdafCore:
         store_path = metadata_store_path or self.config.runtime.metadata_store_path
         self.metadata = MetadataRepository(store_path)
         self.metadata.initialize_schema()
+        base_path = self.metadata.store_path.parent
+        self.extraction_dwh = ExtractionDwhRepository(
+            dwh_store_path or base_path / "extraction_dwh.sqlite3"
+        )
+        self.graph = GraphProvenanceRepository(
+            graph_store_path or base_path / "graph_context.sqlite3"
+        )
 
     def health(self) -> dict[str, str]:
         metadata = package_metadata()
@@ -188,6 +199,157 @@ class KdafCore:
         except MetadataError as exc:
             raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
 
+    def register_source(
+        self,
+        name: str,
+        locator: str,
+        source_type: str = "csv",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self.metadata.create_source(name, source_type, locator, metadata).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def list_sources(self) -> list[dict[str, Any]]:
+        return [source.to_dict() for source in self.metadata.list_sources()]
+
+    def get_source(self, source_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.get_source(source_id).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def extract_source(self, source_id: str) -> dict[str, Any]:
+        try:
+            source = self.metadata.get_source(source_id)
+            batch = self.metadata.start_extraction(source.id)
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+        try:
+            payload = CsvExtractor().extract(source.locator)
+            dwh_result = self.extraction_dwh.load(batch.id, source.id, payload)
+            self.metadata.update_source_hash(source.id, payload.content_hash)
+            self.metadata.add_provenance_link(
+                source.id, batch.id, "dwh", "extraction_batch", batch.id
+            )
+            for row_id in dwh_result.row_ids:
+                self.metadata.add_provenance_link(
+                    source.id, batch.id, "dwh", "extracted_row", row_id
+                )
+            graph_link = self.graph.link_source(source_id=source.id, batch_id=batch.id)
+            self.metadata.add_provenance_link(
+                source.id, batch.id, "neo4j", "semantic_context", graph_link.context_id
+            )
+            completed = self.metadata.finish_extraction(
+                batch.id, status="completed", row_count=dwh_result.row_count
+            )
+        except ExtractionError as exc:
+            self.metadata.finish_extraction(
+                batch.id,
+                status="failed",
+                error_code=exc.code,
+                error_message=str(exc),
+            )
+            raise KdafError(str(exc), code=exc.code) from exc
+        except (GraphError, MetadataError) as exc:
+            self.metadata.finish_extraction(
+                batch.id,
+                status="failed",
+                error_code="provenance_error",
+                error_message="Extraction provenance could not be stored",
+            )
+            raise KdafError(
+                "Extraction provenance could not be stored", code="provenance_error"
+            ) from exc
+
+        return {
+            **completed.to_dict(),
+            "content_hash": payload.content_hash,
+            "provenance_link_count": dwh_result.row_count + 2,
+        }
+
+    def get_extraction(self, batch_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.get_extraction(batch_id).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def list_extractions(self, source_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            return [batch.to_dict() for batch in self.metadata.list_extractions(source_id)]
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def get_provenance(self, batch_id: str) -> dict[str, Any]:
+        try:
+            batch = self.metadata.get_extraction(batch_id)
+            source = self.metadata.get_source(batch.source_id)
+            links = self.metadata.list_provenance_links(batch.id)
+            dwh_trace = self.extraction_dwh.trace_batch(batch.id)
+            graph_links = self.graph.list_for_batch(batch.id)
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+        except ExtractionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+        return {
+            "source": source.to_dict(),
+            "extraction": batch.to_dict(),
+            "metadata_links": [link.to_dict() for link in links],
+            "dwh": dwh_trace,
+            "graph": [link.to_dict() for link in graph_links],
+        }
+
+    def enqueue_validation(
+        self,
+        subject_type: str,
+        subject_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self.metadata.enqueue_validation(subject_type, subject_id, payload).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def list_validations(self, status: str | None = None) -> list[dict[str, Any]]:
+        try:
+            return [item.to_dict() for item in self.metadata.list_validations(status)]
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def get_validation(self, validation_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.get_validation(validation_id).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def approve_validation(
+        self, validation_id: str, reviewer: str, comment: str = ""
+    ) -> dict[str, Any]:
+        return self._decide_validation(validation_id, "approved", reviewer, comment)
+
+    def reject_validation(
+        self, validation_id: str, reviewer: str, comment: str = ""
+    ) -> dict[str, Any]:
+        return self._decide_validation(validation_id, "rejected", reviewer, comment)
+
+    def comment_validation(self, validation_id: str, reviewer: str, comment: str) -> dict[str, Any]:
+        try:
+            return self.metadata.comment_validation(validation_id, reviewer, comment).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def _decide_validation(
+        self, validation_id: str, status: str, reviewer: str, comment: str
+    ) -> dict[str, Any]:
+        try:
+            return self.metadata.decide_validation(
+                validation_id, status, reviewer, comment
+            ).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
     def starter_dwh_schema(self) -> dict[str, str]:
         artifacts = starter_dwh_sql_artifacts()
         return {
@@ -299,6 +461,8 @@ def _safe_database_summary(database_config: Any) -> dict[str, Any]:
 
 
 def _metadata_error_code(error: MetadataError) -> str:
-    if "not found" in str(error).lower():
-        return "not_found"
-    return "metadata_error"
+    return error.code
+
+
+def _core_metadata_error(error: MetadataError) -> KdafError:
+    return KdafError(str(error), code=_metadata_error_code(error))

@@ -46,3 +46,39 @@ def test_readme_documents_v02_public_commands() -> None:
     assert '"tool":"health"' in readme
     assert '"tool":"starter_dwh.load"' in readme
     assert '"tool":"starter_graph.load"' in readme
+
+
+@pytest.mark.smoke
+def test_v04_contract_and_demo_are_published() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    contract = Path("docs/provenance-validation-contract-v0.4.md").read_text(encoding="utf-8")
+    sample = Path("examples/v04_actuals.csv").read_text(encoding="utf-8")
+
+    assert "source register" in readme
+    assert "validation approve" in readme
+    for requirement in (
+        "Source registry",
+        "Extracted artifacts and provenance",
+        "Validation queue and state machine",
+        "Reviewer decisions and audit expectations",
+        "Postgres metadata DB",
+        "Separate Postgres DWH",
+        "Neo4j",
+    ):
+        assert requirement in contract
+    assert sample.startswith("entity,department,account,period,scenario,amount")
+
+
+@pytest.mark.smoke
+def test_user_guide_distinguishes_v03_and_v04_workflows() -> None:
+    guide = Path("docs/user-guide.md").read_text(encoding="utf-8")
+
+    assert "## v0.3 and v0.4 at a Glance" in guide
+    assert "Use v0.3 by itself" in guide
+    assert "Use v0.4 by itself" in guide
+    assert "Use them together" in guide
+    assert "## Register and Extract a CSV with v0.4" in guide
+    assert "## Use v0.3 and v0.4 Together" in guide
+    assert "source extract <source-id>" in guide
+    assert "validation approve <validation-id>" in guide
+    assert "document ingestion or extraction from real FP&A files" not in guide

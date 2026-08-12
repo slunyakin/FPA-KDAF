@@ -1,0 +1,3 @@
+entity,department,account,period,scenario,amount
+acme-us,sales,revenue,2026-01,actual,100000
+acme-us,engineering,payroll,2026-01,actual,46000
