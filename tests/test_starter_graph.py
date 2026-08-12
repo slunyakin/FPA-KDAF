@@ -51,6 +51,11 @@ def test_starter_graph_model_has_stable_finance_concept_ids() -> None:
         "scenario:forecast",
     ]
     assert "metric:budget_vs_actuals" in {metric["id"] for metric in model["metrics"]}
+    assert all(
+        concept["validation_state"] == "seeded"
+        for group in ("accounts", "departments", "scenarios", "metrics")
+        for concept in model[group]
+    )
 
 
 def test_starter_graph_artifacts_link_to_dwh_dimensions_not_fact_tables() -> None:

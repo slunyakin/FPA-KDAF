@@ -1,5 +1,11 @@
 """KDAF public package surface."""
 
+from kdaf.answers import (
+    AnswerError,
+    GroundedAnswerService,
+    OllamaProvider,
+    OpenAICompatibleProvider,
+)
 from kdaf.config import (
     ConfigError,
     DatabaseConfig,
@@ -12,6 +18,7 @@ from kdaf.core import KdafCore, KdafError
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
 from kdaf.graph import GraphProvenanceRepository
 from kdaf.metadata import (
+    AuditEvent,
     CompetencyQuestion,
     ExtractionBatch,
     MetadataError,
@@ -24,6 +31,15 @@ from kdaf.metadata import (
     Source,
     ValidationItem,
     package_metadata,
+)
+from kdaf.retrieval import (
+    CarpRetrievalService,
+    EvidencePacketBuilder,
+    Neo4jGraphContextProvider,
+    PackagedGraphContextProvider,
+    PostgresDwhQueryService,
+    ReadOnlyDwhQueryService,
+    RetrievalError,
 )
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
@@ -42,8 +58,11 @@ from kdaf.starter_questions import (
     starter_question_catalog,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
+    "AnswerError",
+    "AuditEvent",
+    "CarpRetrievalService",
     "ConfigError",
     "CompetencyQuestion",
     "CsvExtractor",
@@ -51,6 +70,7 @@ __all__ = [
     "ExtractionBatch",
     "ExtractionDwhRepository",
     "ExtractionError",
+    "EvidencePacketBuilder",
     "GraphProvenanceRepository",
     "KdafCore",
     "KdafConfig",
@@ -60,9 +80,17 @@ __all__ = [
     "MvgArtifact",
     "Neo4jConfig",
     "Neo4jConnectionSettings",
+    "Neo4jGraphContextProvider",
+    "GroundedAnswerService",
+    "OllamaProvider",
+    "OpenAICompatibleProvider",
     "PackageMetadata",
     "Project",
     "ProvenanceLink",
+    "PackagedGraphContextProvider",
+    "PostgresDwhQueryService",
+    "ReadOnlyDwhQueryService",
+    "RetrievalError",
     "RuntimeConfig",
     "Run",
     "Source",

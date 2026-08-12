@@ -21,7 +21,8 @@ UNWIND [
   {id: 'account:headcount', name: 'Headcount', table: 'fpna_accounts', key: 'account_id', value: 'headcount'}
 ] AS row
 MERGE (concept:AccountConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name
+SET concept.name = row.name,
+    concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
 SET reference.table = row.table,
     reference.key = row.key,
@@ -38,7 +39,8 @@ UNWIND [
   {id: 'department:g_and_a', name: 'G&A', table: 'fpna_departments', key: 'department_id', value: 'g_and_a'}
 ] AS row
 MERGE (concept:DepartmentConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name
+SET concept.name = row.name,
+    concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
 SET reference.table = row.table,
     reference.key = row.key,
@@ -54,7 +56,8 @@ UNWIND [
   {id: 'scenario:forecast', name: 'Q1 Forecast', table: 'fpna_scenarios', key: 'scenario_id', value: 'forecast'}
 ] AS row
 MERGE (concept:ScenarioConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name
+SET concept.name = row.name,
+    concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
 SET reference.table = row.table,
     reference.key = row.key,
@@ -107,7 +110,8 @@ UNWIND [
 ] AS row
 MERGE (metric:MetricConcept:SemanticConcept {id: row.id})
 SET metric.name = row.name,
-    metric.description = row.description
+    metric.description = row.description,
+    metric.validation_state = 'seeded'
 MERGE (domain)-[:HAS_CONCEPT]->(metric)
 WITH metric, row
 UNWIND row.depends_on AS dependency_id

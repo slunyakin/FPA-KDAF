@@ -1,8 +1,8 @@
 # KDAF User Guide
 
-This guide covers both the v0.3 FP&A starter kit and the v0.4 extraction and validation workflow.
-KDAF is still early, but it now supports two complementary jobs: designing a small finance analytics
-model and bringing a real CSV source into a traceable, expert-reviewed workflow.
+This guide covers the v0.3 FP&A starter kit, v0.4 extraction and validation, and v0.5 DWH-aware
+retrieval and grounded answers. KDAF now supports model design, governed ingestion, and auditable
+question-to-answer workflows while keeping semantic context separate from financial facts.
 
 ## v0.3 and v0.4 at a Glance
 
@@ -600,6 +600,60 @@ If `provenance get` cannot find its DWH or graph records, pass the same `--dwh-s
 If a validation transition returns `invalid_transition`, inspect the item first. Approved and
 rejected items are terminal and cannot move back to pending or needs-changes.
 
+## Retrieve Evidence and Generate an Answer with v0.5
+
+First load the starter DWH and starter questions, then create a run. Keep the returned project,
+budget-vs-actual question, and run IDs:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 project create "Grounded FP&A"
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 starter-dwh load
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 starter-questions load <project-id>
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 competency-question list \
+  --project-id <project-id>
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 run create <project-id> \
+  --status retrieval
+```
+
+Inspect the controlled warehouse query and retrieve CARP context:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 dwh query budget_vs_actuals
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 carp retrieve <question-id>
+```
+
+The graph command uses Neo4j. For a Docker-free walkthrough, add `--offline-graph`; that adapter uses
+the packaged semantic seed and never contains warehouse amounts.
+
+Build the evidence packet and save the JSON output:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 \
+  evidence build <question-id> <run-id> --offline-graph > evidence.json
+
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 answer generate evidence.json
+```
+
+The answer contains citations such as `[evidence:<entry-id>]`. A provider answer with missing or
+unknown citations is replaced with an `insufficiently_supported` result. KDAF records the prompt,
+provider, model, parameters, final output, packet ID, project ID, and run ID in metadata audit state.
+API keys are not logged.
+
+For one command that demonstrates graph retrieval, DWH execution, packet construction, a cited
+answer, an unsupported-claim refusal, and the no-facts-in-graph boundary:
+
+```bash
+kdaf --metadata-store .kdaf/v05-metadata.sqlite3 \
+  --dwh-store .kdaf/v05-financial-dwh.sqlite3 \
+  grounded-demo <question-id> <run-id> --offline-graph
+```
+
+The tool server exposes the same workflow through `dwh.query`, `carp.retrieve`, `evidence.build`,
+`answer.generate`, and `grounded_answer.demo`. All use the same core services as the CLI.
+
 ## Current Limits
 
 KDAF does not yet provide:
@@ -607,10 +661,10 @@ KDAF does not yet provide:
 - extractors for formats other than CSV
 - automatic project-to-source, MVG-to-source, or MVG-to-extraction associations
 - production Postgres/Neo4j persistence adapters for the v0.4 local extraction workflow
-- retrieval over graph context and DWH facts
-- grounded natural-language answer generation
+- production Postgres persistence for the local starter DWH query harness
+- provider-specific retry, rate-limit, and streaming behavior
 - evaluation benchmarks
 
 Those are planned follow-on slices. The current value combines the reusable v0.3 modeling
-foundation—local services, starter financial data, starter semantic graph, starter questions, and
-MVG scoping—with v0.4 CSV ingestion, cross-store provenance, and auditable expert validation.
+foundation, v0.4 CSV ingestion and expert validation, and v0.5 DWH-aware retrieval, evidence
+packets, citation enforcement, and grounded-answer auditing.

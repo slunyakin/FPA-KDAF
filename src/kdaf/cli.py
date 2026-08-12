@@ -205,6 +205,45 @@ def build_parser() -> argparse.ArgumentParser:
         action_parser.add_argument("--reviewer", required=True)
         action_parser.add_argument("--comment", required=action == "comment", default="")
 
+    dwh = subparsers.add_parser("dwh", help="Run controlled read-only DWH queries")
+    dwh_subparsers = dwh.add_subparsers(dest="dwh_command", required=True)
+    dwh_query = dwh_subparsers.add_parser("query", help="Execute an allow-listed DWH query")
+    dwh_query.add_argument("query_id")
+    dwh_query.add_argument("--parameters-json", default="{}")
+
+    carp = subparsers.add_parser("carp", help="Retrieve context-aware graph relevance")
+    carp_subparsers = carp.add_subparsers(dest="carp_command", required=True)
+    carp_retrieve = carp_subparsers.add_parser("retrieve")
+    carp_retrieve.add_argument("question_id")
+    carp_retrieve.add_argument("--offline-graph", action="store_true")
+
+    evidence = subparsers.add_parser("evidence", help="Build auditable evidence packets")
+    evidence_subparsers = evidence.add_subparsers(dest="evidence_command", required=True)
+    evidence_build = evidence_subparsers.add_parser("build")
+    evidence_build.add_argument("question_id")
+    evidence_build.add_argument("run_id")
+    evidence_build.add_argument("--offline-graph", action="store_true")
+
+    answer = subparsers.add_parser("answer", help="Generate answers from evidence packets")
+    answer_subparsers = answer.add_subparsers(dest="answer_command", required=True)
+    answer_generate = answer_subparsers.add_parser("generate")
+    answer_generate.add_argument("evidence_file", type=Path)
+    answer_generate.add_argument(
+        "--provider",
+        choices=("deterministic", "ollama", "openai-compatible"),
+        default="deterministic",
+    )
+    answer_generate.add_argument("--model", default="kdaf-grounded-demo")
+    answer_generate.add_argument("--parameters-json", default="{}")
+    answer_generate.add_argument("--claim")
+    answer_generate.add_argument("--base-url")
+    answer_generate.add_argument("--api-key")
+
+    demo = subparsers.add_parser("grounded-demo", help="Run the v0.5 grounded answer slice")
+    demo.add_argument("question_id")
+    demo.add_argument("run_id")
+    demo.add_argument("--offline-graph", action="store_true")
+
     return parser
 
 
@@ -257,6 +296,38 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return core.get_provenance(args.batch_id)
     if args.command == "validation":
         return _dispatch_validation(core, args)
+    if args.command == "dwh":
+        return core.query_dwh(
+            args.query_id,
+            _parse_json_object(args.parameters_json, "parameters-json"),
+            dwh_store_path=args.dwh_store,
+        )
+    if args.command == "carp":
+        return core.retrieve_carp_context(args.question_id, offline_graph=args.offline_graph)
+    if args.command == "evidence":
+        return core.build_evidence_packet(
+            args.question_id,
+            args.run_id,
+            dwh_store_path=args.dwh_store,
+            offline_graph=args.offline_graph,
+        )
+    if args.command == "answer":
+        return core.generate_grounded_answer(
+            _read_json_object(args.evidence_file, "evidence packet"),
+            provider_name=args.provider,
+            model=args.model,
+            parameters=_parse_json_object(args.parameters_json, "parameters-json"),
+            requested_claim=args.claim,
+            base_url=args.base_url,
+            api_key=args.api_key,
+        )
+    if args.command == "grounded-demo":
+        return core.grounded_answer_demo(
+            args.question_id,
+            args.run_id,
+            dwh_store_path=args.dwh_store,
+            offline_graph=args.offline_graph,
+        )
     raise KdafError(f"Unknown command: {args.command}")
 
 
@@ -399,6 +470,14 @@ def _parse_json_object(raw: str, option: str) -> dict[str, Any]:
     if not isinstance(result, dict):
         raise KdafError(f"{option} must be a JSON object", code="invalid_input")
     return result
+
+
+def _read_json_object(path: Path, option: str) -> dict[str, Any]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise KdafError(f"{option} file could not be read", code="not_found") from exc
+    return _parse_json_object(raw, option)
 
 
 def _write_json(payload: Any, output: TextIO) -> None:

@@ -6,10 +6,27 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from kdaf.answers import (
+    AnswerError,
+    DeterministicGroundedProvider,
+    GroundedAnswerService,
+    OllamaProvider,
+    OpenAICompatibleProvider,
+)
 from kdaf.config import KdafConfig, load_config
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
 from kdaf.graph import GraphError, GraphProvenanceRepository
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
+from kdaf.retrieval import (
+    CarpRetrievalService,
+    EvidencePacketBuilder,
+    Neo4jGraphContextProvider,
+    PackagedGraphContextProvider,
+    PostgresDwhQueryService,
+    ReadOnlyDwhQueryService,
+    RetrievalError,
+    starter_question_for_text,
+)
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
     Neo4jConnectionSettings,
@@ -63,6 +80,7 @@ class KdafCore:
         self.metadata = MetadataRepository(store_path)
         self.metadata.initialize_schema()
         base_path = self.metadata.store_path.parent
+        self._configured_dwh_store_path = dwh_store_path
         self.extraction_dwh = ExtractionDwhRepository(
             dwh_store_path or base_path / "extraction_dwh.sqlite3"
         )
@@ -376,8 +394,198 @@ class KdafCore:
         except StarterDwhError as exc:
             raise KdafError(str(exc), code="starter_dwh_not_loaded") from exc
 
+    def query_dwh(
+        self,
+        query_id: str,
+        parameters: dict[str, Any] | None = None,
+        dwh_store_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Run one controlled query against the separate financial DWH boundary."""
+
+        try:
+            result = self._dwh_query_service(dwh_store_path).execute(query_id, parameters)
+            self.metadata.record_audit_event(
+                "dwh.query.executed",
+                "dwh_query",
+                result.id,
+                {
+                    "query_id": result.query_id,
+                    "statement_fingerprint": result.statement_fingerprint,
+                    "parameters": result.parameters,
+                    "row_count": result.row_count,
+                    "duration_ms": result.duration_ms,
+                    "mode": result.mode,
+                },
+            )
+            return result.to_dict()
+        except RetrievalError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def retrieve_carp_context(
+        self,
+        question_id: str,
+        *,
+        offline_graph: bool = False,
+    ) -> dict[str, Any]:
+        """Retrieve relevant graph semantics, provenance links, and validation state."""
+
+        provider = (
+            PackagedGraphContextProvider()
+            if offline_graph
+            else Neo4jGraphContextProvider(self._neo4j_connection_settings())
+        )
+        try:
+            return CarpRetrievalService(self.metadata, provider).retrieve(question_id)
+        except RetrievalError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def build_evidence_packet(
+        self,
+        question_id: str,
+        run_id: str,
+        *,
+        dwh_store_path: str | Path | None = None,
+        offline_graph: bool = False,
+    ) -> dict[str, Any]:
+        try:
+            question = self.metadata.get_competency_question(question_id).to_dict()
+            run = self.metadata.get_run(run_id).to_dict()
+            if question["project_id"] != run["project_id"]:
+                raise RetrievalError(
+                    "Run and competency question must share a project", "invalid_id"
+                )
+            starter_question = starter_question_for_text(question["question_text"])
+            graph_context = self.retrieve_carp_context(question_id, offline_graph=offline_graph)
+            dwh_result = self._dwh_query_service(dwh_store_path).execute(starter_question.category)
+            self.metadata.record_audit_event(
+                "dwh.query.executed",
+                "dwh_query",
+                dwh_result.id,
+                {
+                    "query_id": dwh_result.query_id,
+                    "statement_fingerprint": dwh_result.statement_fingerprint,
+                    "parameters": dwh_result.parameters,
+                    "row_count": dwh_result.row_count,
+                    "duration_ms": dwh_result.duration_ms,
+                    "mode": dwh_result.mode,
+                    "run_id": run["id"],
+                },
+            )
+            packet = EvidencePacketBuilder().build(
+                question=question,
+                run=run,
+                dwh_query=dwh_result,
+                graph_context=graph_context,
+            )
+            self.metadata.record_audit_event(
+                "evidence_packet.built",
+                "evidence_packet",
+                packet["id"],
+                {
+                    "project_id": packet["project_id"],
+                    "run_id": packet["run_id"],
+                    "competency_question_id": packet["competency_question_id"],
+                    "dwh_query_ids": packet["provenance"]["dwh_query_ids"],
+                },
+            )
+            return packet
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+        except RetrievalError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def generate_grounded_answer(
+        self,
+        evidence_packet: dict[str, Any],
+        *,
+        provider_name: str = "deterministic",
+        model: str = "kdaf-grounded-demo",
+        parameters: dict[str, Any] | None = None,
+        requested_claim: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            if provider_name == "deterministic":
+                provider = DeterministicGroundedProvider(evidence_packet)
+            elif provider_name == "ollama":
+                provider = OllamaProvider(base_url or "http://localhost:11434")
+            elif provider_name == "openai-compatible":
+                if base_url is None:
+                    raise AnswerError(
+                        "Provider base URL is required for openai-compatible",
+                        "missing_field",
+                    )
+                provider = OpenAICompatibleProvider(base_url, api_key=api_key)
+            else:
+                raise AnswerError(f"Unknown answer provider: {provider_name}", "invalid_provider")
+            return GroundedAnswerService(self.metadata).generate(
+                evidence_packet,
+                provider,
+                model=model,
+                parameters=parameters,
+                requested_claim=requested_claim,
+            )
+        except AnswerError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def grounded_answer_demo(
+        self,
+        question_id: str,
+        run_id: str,
+        *,
+        dwh_store_path: str | Path | None = None,
+        offline_graph: bool = False,
+    ) -> dict[str, Any]:
+        packet = self.build_evidence_packet(
+            question_id,
+            run_id,
+            dwh_store_path=dwh_store_path,
+            offline_graph=offline_graph,
+        )
+        answer = self.generate_grounded_answer(packet)
+        refusal = self.generate_grounded_answer(
+            packet,
+            requested_claim="What was the unsupported cash balance?",
+        )
+        return {
+            "evidence_packet": packet,
+            "answer": answer,
+            "unsupported_claim": refusal,
+            "architecture": {
+                "financial_facts_store": "financial_dwh",
+                "graph_stores_financial_facts": False,
+                "graph_content": [
+                    "meaning",
+                    "relationships",
+                    "relevance_context",
+                    "provenance_links",
+                    "validation_state",
+                ],
+            },
+        }
+
     def _default_starter_dwh_path(self) -> Path:
         return self.metadata.store_path.parent / "starter_dwh.sqlite3"
+
+    def _dwh_query_service(
+        self, dwh_store_path: str | Path | None
+    ) -> ReadOnlyDwhQueryService | PostgresDwhQueryService:
+        local_store_path = dwh_store_path or self._configured_dwh_store_path
+        if local_store_path is not None:
+            return ReadOnlyDwhQueryService(local_store_path)
+        config = self.config.dwh_db
+        return PostgresDwhQueryService(
+            host=config.host,
+            port=config.port,
+            database=config.database,
+            user=config.user,
+            password=config.password,
+        )
 
     def starter_graph_schema(self) -> dict[str, str]:
         artifacts = starter_graph_cypher_artifacts()

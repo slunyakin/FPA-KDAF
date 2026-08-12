@@ -48,6 +48,11 @@ TOOL_NAMES = (
     "validation.approve",
     "validation.reject",
     "validation.comment",
+    "dwh.query",
+    "carp.retrieve",
+    "evidence.build",
+    "answer.generate",
+    "grounded_answer.demo",
 )
 
 
@@ -244,6 +249,41 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             _required_arg(args, "reviewer"),
             _required_arg(args, "comment"),
         )
+    if tool_name == "dwh.query":
+        return core.query_dwh(
+            _required_arg(args, "query_id"),
+            _optional_object_arg(args, "parameters"),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+        )
+    if tool_name == "carp.retrieve":
+        return core.retrieve_carp_context(
+            _required_arg(args, "question_id"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
+    if tool_name == "evidence.build":
+        return core.build_evidence_packet(
+            _required_arg(args, "question_id"),
+            _required_arg(args, "run_id"),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
+    if tool_name == "answer.generate":
+        return core.generate_grounded_answer(
+            _required_object_arg(args, "evidence_packet"),
+            provider_name=_optional_string_arg(args, "provider") or "deterministic",
+            model=_optional_string_arg(args, "model") or "kdaf-grounded-demo",
+            parameters=_optional_object_arg(args, "parameters"),
+            requested_claim=_optional_string_arg(args, "claim"),
+            base_url=_optional_string_arg(args, "base_url"),
+            api_key=_optional_string_arg(args, "api_key"),
+        )
+    if tool_name == "grounded_answer.demo":
+        return core.grounded_answer_demo(
+            _required_arg(args, "question_id"),
+            _required_arg(args, "run_id"),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 
@@ -282,6 +322,31 @@ def _optional_bool_arg(arguments: dict[str, Any], name: str, default: bool) -> b
     if not isinstance(value, bool):
         raise KdafError(f"Argument must be a boolean: {name}", code="invalid_argument")
     return value
+
+
+def _required_object_arg(arguments: dict[str, Any], name: str) -> dict[str, Any]:
+    if name not in arguments:
+        raise KdafError(f"Missing required argument: {name}", code="missing_argument")
+    value = arguments[name]
+    if not isinstance(value, dict):
+        raise KdafError(f"Argument must be an object: {name}", code="invalid_argument")
+    return value
+
+
+def _optional_object_arg(arguments: dict[str, Any], name: str) -> dict[str, Any]:
+    value = arguments.get(name, {})
+    if not isinstance(value, dict):
+        raise KdafError(f"Argument must be an object: {name}", code="invalid_argument")
+    return value
+
+
+def _optional_string_arg(arguments: dict[str, Any], name: str) -> str | None:
+    value = arguments.get(name)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise KdafError(f"Argument must be a non-empty string: {name}", code="invalid_argument")
+    return value.strip()
 
 
 def _error_response(code: str, message: str) -> dict[str, Any]:

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
 TERMINAL_VALIDATION_STATUSES = frozenset({"approved", "rejected"})
 
@@ -30,7 +30,7 @@ def package_metadata() -> PackageMetadata:
     try:
         version = importlib_metadata.version("kdaf")
     except importlib_metadata.PackageNotFoundError:
-        version = "0.4.0"
+        version = "0.5.0"
     return PackageMetadata(name="kdaf", version=version)
 
 
@@ -183,6 +183,19 @@ class MvgArtifact:
         }
 
 
+@dataclass(frozen=True)
+class AuditEvent:
+    id: str
+    event_type: str
+    subject_type: str | None
+    subject_id: str | None
+    payload: dict[str, Any]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class MetadataRepository:
     """SQLite local adapter for framework, MVG, and audit workflow metadata."""
 
@@ -265,6 +278,69 @@ class MetadataRepository:
         if row is None:
             raise MetadataError(f"Run not found: {cleaned_id}", "not_found")
         return Run(**dict(row))
+
+    def record_audit_event(
+        self,
+        event_type: str,
+        subject_type: str | None,
+        subject_id: str | None,
+        payload: dict[str, Any],
+    ) -> AuditEvent:
+        """Persist framework audit metadata without crossing into the financial DWH."""
+
+        cleaned_event_type = _require_text("audit.event_type", event_type)
+        cleaned_payload = _require_object("audit.payload", payload)
+        event = AuditEvent(
+            id=str(uuid4()),
+            event_type=cleaned_event_type,
+            subject_type=(
+                _require_text("audit.subject_type", subject_type)
+                if subject_type is not None
+                else None
+            ),
+            subject_id=(
+                _require_text("audit.subject_id", subject_id) if subject_id is not None else None
+            ),
+            payload=cleaned_payload,
+            created_at=_timestamp(),
+        )
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO kdaf_audit_log
+                    (id, event_type, subject_type, subject_id, payload_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.id,
+                    event.event_type,
+                    event.subject_type,
+                    event.subject_id,
+                    _json(event.payload),
+                    event.created_at,
+                ),
+            )
+        return event
+
+    def list_audit_events(self, event_type: str | None = None) -> list[AuditEvent]:
+        query = "SELECT * FROM kdaf_audit_log"
+        params: tuple[str, ...] = ()
+        if event_type is not None:
+            query += " WHERE event_type = ?"
+            params = (_require_text("audit.event_type", event_type),)
+        with self._connect() as connection:
+            rows = connection.execute(query + " ORDER BY created_at, id", params).fetchall()
+        return [
+            AuditEvent(
+                id=row["id"],
+                event_type=row["event_type"],
+                subject_type=row["subject_type"],
+                subject_id=row["subject_id"],
+                payload=json.loads(row["payload_json"]),
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     def create_source(
         self,
@@ -697,7 +773,7 @@ class MetadataRepository:
                 (cleaned_id,),
             ).fetchone()
         if row is None:
-            raise MetadataError(f"Competency question not found: {cleaned_id}")
+            raise MetadataError(f"Competency question not found: {cleaned_id}", "not_found")
         return _competency_question_from_row(row)
 
     def create_mvg_artifact(
@@ -783,7 +859,7 @@ class MetadataRepository:
                 (cleaned_id,),
             ).fetchone()
         if row is None:
-            raise MetadataError(f"MVG artifact not found: {cleaned_id}")
+            raise MetadataError(f"MVG artifact not found: {cleaned_id}", "not_found")
         return self._mvg_artifact_from_row(row)
 
     def add_question_to_mvg(self, mvg_id: str, question_id: str) -> MvgArtifact:
