@@ -27,6 +27,7 @@ from kdaf.starter_graph import (
     starter_graph_cypher_artifacts,
 )
 from kdaf.starter_kit import StarterKitLoadSummary, StarterKitService
+from kdaf.starter_kit_demo import run_starter_kit_demo
 from kdaf.starter_questions import (
     StarterQuestion,
     StarterQuestionCatalog,
@@ -65,6 +66,7 @@ __all__ = [
     "__version__",
     "load_config",
     "package_metadata",
+    "run_starter_kit_demo",
     "starter_question_catalog",
     "starter_graph_cypher_artifacts",
     "starter_dwh_sql_artifacts",
