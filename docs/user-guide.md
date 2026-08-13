@@ -71,6 +71,11 @@ grounding, provenance, citations, unsupported-claim refusal, and validation comp
 `eval list --run-id <run-id>` or `eval get <evaluation-result-id>` to inspect the durable metadata.
 Case errors use a stable `{"code": "...", "message": "..."}` shape and do not terminate the run.
 
+For the versioned seven-case finance baseline, run `eval benchmark <project-id> --offline-graph`.
+It covers variance, budget versus actuals, forecast movement, department spend, revenue drivers,
+provenance-heavy evidence, and unsupported-claim refusal. The full rubric is in the
+[FP&A benchmark guide](fpna-benchmark-v0.6.md).
+
 The useful shape is:
 
 ```text
