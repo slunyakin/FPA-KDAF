@@ -10,15 +10,15 @@ model provider. This decision does not classify KDAF as production-ready: produc
 identity, access control, retention, monitoring, and provider operations remain adopter
 responsibilities or future work.
 
-The final package-version update, release notes, and consolidated adoption navigation belong to the
-dependent adoption-package issue, KDAF-033.
+The adoption package now aligns version metadata at `0.6.0` and publishes release notes, a
+fresh-clone quickstart, architecture documentation, and consolidated adoption navigation.
 
 ## Readiness checklist
 
 | Gate | Status | Evidence |
 | --- | --- | --- |
 | Static foundation smoke | Pass | `pytest -m smoke`: 5 passed |
-| Full automated suite | Pass | `pytest`: 154 passed, 3 clean Docker skips |
+| Full automated suite | Pass | `pytest`: 159 passed, 3 clean Docker skips after adoption packaging |
 | Lint | Pass | `ruff check .`: passed |
 | FP&A benchmark baseline | Pass | 7 selected cases, 7 passed, 0 failed |
 | Offline public demo | Pass | Documented script creates a cited answer and passing evaluation result |
@@ -26,7 +26,7 @@ dependent adoption-package issue, KDAF-033.
 | Bad-request server survival | Pass | JSON-line server processes a valid request after malformed input |
 | Secret/config leakage checks | Pass | Provider/config failures return bounded errors without credentials or traces |
 | Optional live Docker smoke | Not run | 3 tests skipped cleanly: Docker daemon unavailable |
-| Final v0.6 packaging | Pending KDAF-033 | Version, release notes, and adoption index are intentionally downstream |
+| Final v0.6 packaging | Pass | Version `0.6.0`, release notes, quickstart, architecture, and adoption index published |
 
 Commands executed for this report:
 

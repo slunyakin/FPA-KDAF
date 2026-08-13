@@ -22,11 +22,11 @@ CLI and MCP-style tool server:
 | Neo4j | Semantic graph | `bolt://localhost:7687`, browser `http://localhost:7474` |
 | Postgres metadata DB | Framework metadata | `localhost:5432/kdaf_metadata` |
 | Postgres financial DWH | Financial numbers and facts | `localhost:5433/kdaf_financial_dwh` |
-| SQLite metadata store | v0.2 project/run metadata | `.kdaf/metadata.sqlite3` |
-| SQLite extraction DWH adapter | v0.4 extracted financial rows | `.kdaf/extraction_dwh.sqlite3` |
-| SQLite graph adapter | v0.4 semantic provenance references only | `.kdaf/graph_context.sqlite3` |
+| SQLite metadata adapter | Local framework, audit, validation, and evaluation metadata | `.kdaf/metadata.sqlite3` |
+| SQLite DWH adapter | Local starter and extracted financial rows | `.kdaf/financial_dwh.sqlite3` |
+| SQLite graph adapter | Local semantic provenance references only | `.kdaf/graph_context.sqlite3` |
 
-The v0.4 SQLite files preserve the same physical boundaries as production Postgres and Neo4j. They
+The local SQLite files preserve the same physical boundaries as production Postgres and Neo4j. They
 are a local execution harness, not a change to storage ownership: CSV values go only to the DWH
 adapter, while graph provenance contains identifiers and relationships only.
 
@@ -38,16 +38,19 @@ KDAF starts as a local-first framework. The default Docker Compose stack is suit
 
 ## Non-Goals
 
-- KDAF v0.2 is not a production deployment template.
+- KDAF v0.6 is not a production deployment template.
 - KDAF does not prescribe a single finance domain model.
 - KDAF does not store financial facts, measures, or time series values in Neo4j.
 - KDAF does not require Docker for static tests or package development.
 
 ## Quick Start
 
-For a guided consumer walkthrough, see [docs/user-guide.md](docs/user-guide.md). For an explanation
-of the value and workflow for analysts, finance leaders, engineers, developers, auditors, and
-operators, see [the role-based consumer guide](docs/role-based-consumer-guide.md).
+Start with the [v0.6 fresh-clone quickstart](docs/quickstart-v0.6.md). It installs KDAF, runs static
+smoke tests, and produces a cited FP&A answer plus a stored evaluation result without Docker or an
+external model provider.
+
+The [v0.6 adoption index](docs/adoption-v0.6.md) links the architecture, runnable demo, FP&A
+benchmark, readiness evidence, release notes, and role-based adoption paths.
 
 Create and activate a virtual environment, then install developer dependencies:
 
@@ -440,7 +443,8 @@ pytest -m integration
 
 ## Project Status
 
-KDAF v0.5 adds controlled read-only DWH queries, CARP semantic retrieval, evidence packets,
-Ollama/OpenAI-compatible grounded answer generation, citation validation, prompt/output auditing,
-and a runnable question-to-cited-answer slice. It retains the v0.3 starter kit and v0.4 CSV
-extraction, provenance, and expert-validation workflows.
+KDAF v0.6.0 adds repeatable evaluation, a versioned seven-case FP&A benchmark, an adoption-ready
+public demo, and published release-readiness evidence. It retains the v0.3 starter kit, v0.4 CSV
+extraction/provenance/validation, and v0.5 DWH-aware CARP, evidence, citation, refusal, and grounded
+answer workflows. The release is ready for public local evaluation and early-adopter inspection;
+see the [release notes](docs/releases/v0.6.0.md) and [known limitations](docs/release-readiness-v0.6.md#unsupported-areas-and-known-limitations).

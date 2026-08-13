@@ -323,7 +323,8 @@ the KDAF services.
 
 ## Current Boundaries
 
-KDAF v0.5 provides the first complete question-to-grounded-answer slice, but consumers should plan
+KDAF v0.6 provides a complete question-to-grounded-answer slice plus repeatable evaluation and
+public adoption evidence, but consumers should plan
 for the following boundaries:
 
 - the starter catalog and query set cover a small FP&A domain rather than every finance workflow
