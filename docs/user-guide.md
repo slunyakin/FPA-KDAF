@@ -692,8 +692,7 @@ KDAF does not yet provide:
 - production Postgres/Neo4j persistence adapters for the v0.4 local extraction workflow
 - production Postgres persistence for the local starter DWH query harness
 - provider-specific retry, rate-limit, and streaming behavior
-- evaluation benchmarks
 
-Those are planned follow-on slices. The current value combines the reusable v0.3 modeling
-foundation, v0.4 CSV ingestion and expert validation, and v0.5 DWH-aware retrieval, evidence
-packets, citation enforcement, and grounded-answer auditing.
+Those are follow-on candidates. The current value combines the reusable v0.3 modeling foundation,
+v0.4 CSV ingestion and expert validation, v0.5 DWH-aware retrieval and grounded-answer auditing,
+and v0.6 evaluation, benchmark, and public-demo evidence.

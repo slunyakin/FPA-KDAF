@@ -297,6 +297,10 @@ packet, generates a cited answer, verifies refusal, and records evaluation-ready
 [public demo tutorial](docs/public-demo-v0.6.md) for expected output and troubleshooting. The same
 shared workflow is exposed as `kdaf public-demo` and `public_demo.run`.
 
+See the [v0.6 release readiness report](docs/release-readiness-v0.6.md) for the test and benchmark
+baseline, optional Docker status, architecture coverage, supported workflows, known limitations,
+and evidence-backed next-release candidates.
+
 ## v0.4 Extraction and Validation Demo
 
 The source-to-review vertical slice uses the sample file at `examples/v04_actuals.csv`. Choose
