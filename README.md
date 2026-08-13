@@ -281,6 +281,22 @@ Use `kdaf eval catalog` to inspect its seven versioned cases and rubric. See the
 [FP&A benchmark guide](docs/fpna-benchmark-v0.6.md) for coverage, expected evidence, grading, and
 case selection. The matching agent tools are `eval.catalog` and `eval.benchmark`.
 
+Run the complete v0.6 public demo without Docker or an external model:
+
+```bash
+python scripts/run_public_demo.py \
+  --metadata-store .kdaf/public-demo-metadata.sqlite3 \
+  --dwh-store .kdaf/public-demo-financial-dwh.sqlite3 \
+  --graph-store .kdaf/public-demo-graph.sqlite3 \
+  --project-name "KDAF v0.6 Public Demo" \
+  --offline-graph
+```
+
+The demo creates a project, loads the starter kit, retrieves CARP context, builds an evidence
+packet, generates a cited answer, verifies refusal, and records evaluation-ready metadata. See the
+[public demo tutorial](docs/public-demo-v0.6.md) for expected output and troubleshooting. The same
+shared workflow is exposed as `kdaf public-demo` and `public_demo.run`.
+
 ## v0.4 Extraction and Validation Demo
 
 The source-to-review vertical slice uses the sample file at `examples/v04_actuals.csv`. Choose

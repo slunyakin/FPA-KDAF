@@ -76,6 +76,10 @@ It covers variance, budget versus actuals, forecast movement, department spend, 
 provenance-heavy evidence, and unsupported-claim refusal. The full rubric is in the
 [FP&A benchmark guide](fpna-benchmark-v0.6.md).
 
+To prove the full workflow from a new project through a cited answer and stored evaluation result,
+follow the [v0.6 public demo tutorial](public-demo-v0.6.md). Its `--offline-graph` path runs locally
+without Docker or an external model provider.
+
 The useful shape is:
 
 ```text
