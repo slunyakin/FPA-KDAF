@@ -1,8 +1,9 @@
 # KDAF User Guide
 
-This guide covers the v0.3 FP&A starter kit, v0.4 extraction and validation, and v0.5 DWH-aware
-retrieval and grounded answers. KDAF now supports model design, governed ingestion, and auditable
-question-to-answer workflows while keeping semantic context separate from financial facts.
+This guide covers the v0.3 FP&A starter kit, v0.4 extraction and validation, v0.5 DWH-aware
+retrieval and grounded answers, and the v0.6 evaluation harness. KDAF supports model design,
+governed ingestion, auditable question-to-answer workflows, and repeatable quality measurement
+while keeping semantic context separate from financial facts.
 
 For a view organized around consumer responsibilities and outcomes, see
 [How KDAF Helps Each Role](role-based-consumer-guide.md).
@@ -53,6 +54,22 @@ KDAF helps you move from finance business questions to a small, inspectable anal
 13. Queue a source or extraction for expert validation.
 14. Request changes, approve, or reject while retaining a timestamped decision history.
 15. Use the same capabilities through the CLI or the agent tool server.
+16. Run repeatable evaluations and inspect durable per-case metrics.
+
+## Evaluate the Grounded Workflow
+
+Load the starter kit, then evaluate every starter competency question:
+
+```bash
+kdaf --metadata-store .kdaf/demo.sqlite3 \
+  --dwh-store .kdaf/starter_dwh.sqlite3 \
+  eval run <project-id> --offline-graph
+```
+
+The JSON summary reports total, passed, and failed cases. Each stored result checks retrieval,
+grounding, provenance, citations, unsupported-claim refusal, and validation completeness. Use
+`eval list --run-id <run-id>` or `eval get <evaluation-result-id>` to inspect the durable metadata.
+Case errors use a stable `{"code": "...", "message": "..."}` shape and do not terminate the run.
 
 The useful shape is:
 

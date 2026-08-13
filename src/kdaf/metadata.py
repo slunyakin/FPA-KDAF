@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
 TERMINAL_VALIDATION_STATUSES = frozenset({"approved", "rejected"})
 
@@ -196,6 +196,21 @@ class AuditEvent:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class EvaluationResult:
+    id: str
+    run_id: str
+    case_id: str
+    status: str
+    metrics: dict[str, Any]
+    details: dict[str, Any]
+    error: dict[str, str] | None
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class MetadataRepository:
     """SQLite local adapter for framework, MVG, and audit workflow metadata."""
 
@@ -211,6 +226,7 @@ class MetadataRepository:
                 connection, "kdaf_validation_queue", _validation_migration_columns()
             )
             _add_missing_columns(connection, "kdaf_audit_log", _audit_migration_columns())
+            _add_missing_columns(connection, "kdaf_eval_results", _eval_migration_columns())
             connection.execute(
                 "INSERT OR IGNORE INTO kdaf_schema_migrations (version, applied_at) VALUES (?, ?)",
                 (SCHEMA_VERSION, _timestamp()),
@@ -278,6 +294,86 @@ class MetadataRepository:
         if row is None:
             raise MetadataError(f"Run not found: {cleaned_id}", "not_found")
         return Run(**dict(row))
+
+    def create_evaluation_result(
+        self,
+        run_id: str,
+        case_id: str,
+        status: str,
+        metrics: dict[str, Any],
+        details: dict[str, Any] | None = None,
+        error: dict[str, str] | None = None,
+    ) -> EvaluationResult:
+        run = self.get_run(run_id)
+        cleaned_case_id = _require_text("evaluation.case_id", case_id)
+        cleaned_status = _require_text("evaluation.status", status)
+        cleaned_metrics = _require_object("evaluation.metrics", metrics)
+        cleaned_details = _require_object("evaluation.details", details or {})
+        cleaned_error = None
+        if error is not None:
+            cleaned_error = {
+                "code": _require_text("evaluation.error.code", error.get("code")),
+                "message": _require_text("evaluation.error.message", error.get("message")),
+            }
+        result = EvaluationResult(
+            id=str(uuid4()),
+            run_id=run.id,
+            case_id=cleaned_case_id,
+            status=cleaned_status,
+            metrics=cleaned_metrics,
+            details=cleaned_details,
+            error=cleaned_error,
+            created_at=_timestamp(),
+        )
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO kdaf_eval_results (
+                    id, run_id, metric_name, metric_value, case_id, status,
+                    details_json, error_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result.id,
+                    result.run_id,
+                    "evaluation_case",
+                    json.dumps(result.metrics, sort_keys=True),
+                    result.case_id,
+                    result.status,
+                    json.dumps(result.details, sort_keys=True),
+                    json.dumps(result.error, sort_keys=True) if result.error else None,
+                    result.created_at,
+                ),
+            )
+        return result
+
+    def get_evaluation_result(self, result_id: str) -> EvaluationResult:
+        cleaned_id = _require_text("evaluation.id", result_id)
+        row = self._fetch_one(
+            """
+            SELECT id, run_id, case_id, status, metric_value, details_json,
+                   error_json, created_at
+            FROM kdaf_eval_results WHERE id = ?
+            """,
+            (cleaned_id,),
+        )
+        if row is None:
+            raise MetadataError(f"Evaluation result not found: {cleaned_id}", "not_found")
+        return _evaluation_result_from_row(row)
+
+    def list_evaluation_results(self, run_id: str | None = None) -> list[EvaluationResult]:
+        query = """
+            SELECT id, run_id, case_id, status, metric_value, details_json,
+                   error_json, created_at FROM kdaf_eval_results
+        """
+        params: tuple[str, ...] = ()
+        if run_id is not None:
+            run = self.get_run(run_id)
+            query += " WHERE run_id = ?"
+            params = (run.id,)
+        with self._connect() as connection:
+            rows = connection.execute(query + " ORDER BY created_at, id", params).fetchall()
+        return [_evaluation_result_from_row(row) for row in rows]
 
     def record_audit_event(
         self,
@@ -1000,7 +1096,9 @@ def _schema_sql() -> str:
     );
     CREATE TABLE IF NOT EXISTS kdaf_eval_results (
         id TEXT PRIMARY KEY, run_id TEXT REFERENCES kdaf_runs(id), metric_name TEXT NOT NULL,
-        metric_value TEXT NOT NULL, created_at TEXT NOT NULL
+        metric_value TEXT NOT NULL, case_id TEXT NOT NULL DEFAULT 'legacy',
+        status TEXT NOT NULL DEFAULT 'recorded', details_json TEXT NOT NULL DEFAULT '{}',
+        error_json TEXT, created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS kdaf_competency_questions (
         id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
@@ -1047,6 +1145,15 @@ def _audit_migration_columns() -> dict[str, str]:
     return {"subject_type": "TEXT", "subject_id": "TEXT"}
 
 
+def _eval_migration_columns() -> dict[str, str]:
+    return {
+        "case_id": "TEXT NOT NULL DEFAULT 'legacy'",
+        "status": "TEXT NOT NULL DEFAULT 'recorded'",
+        "details_json": "TEXT NOT NULL DEFAULT '{}'",
+        "error_json": "TEXT",
+    }
+
+
 def _add_missing_columns(
     connection: sqlite3.Connection, table: str, columns: dict[str, str]
 ) -> None:
@@ -1066,6 +1173,19 @@ def _source_from_row(row: sqlite3.Row) -> Source:
         content_hash=row["content_hash"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+    )
+
+
+def _evaluation_result_from_row(row: sqlite3.Row) -> EvaluationResult:
+    return EvaluationResult(
+        id=row["id"],
+        run_id=row["run_id"],
+        case_id=row["case_id"],
+        status=row["status"],
+        metrics=json.loads(row["metric_value"]),
+        details=json.loads(row["details_json"]),
+        error=json.loads(row["error_json"]) if row["error_json"] else None,
+        created_at=row["created_at"],
     )
 
 
