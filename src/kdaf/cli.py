@@ -262,6 +262,13 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run.add_argument("--case-id", action="append")
     benchmark_run.add_argument("--offline-graph", action="store_true")
 
+    public_demo = subparsers.add_parser(
+        "public-demo", help="Run the v0.6 adoption-ready FP&A demo"
+    )
+    public_demo.add_argument("project_name")
+    public_demo.add_argument("--question-category", default="budget_vs_actuals")
+    public_demo.add_argument("--offline-graph", action="store_true")
+
     return parser
 
 
@@ -368,6 +375,13 @@ def _dispatch(args: argparse.Namespace) -> Any:
                 offline_graph=args.offline_graph,
             )
         raise KdafError(f"Unknown eval command: {args.eval_command}")
+    if args.command == "public-demo":
+        return core.run_public_demo(
+            args.project_name,
+            question_category=args.question_category,
+            dwh_store_path=args.dwh_store,
+            offline_graph=args.offline_graph,
+        )
     raise KdafError(f"Unknown command: {args.command}")
 
 

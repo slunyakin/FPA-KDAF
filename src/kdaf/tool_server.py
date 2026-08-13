@@ -58,6 +58,7 @@ TOOL_NAMES = (
     "eval.get",
     "eval.catalog",
     "eval.benchmark",
+    "public_demo.run",
 )
 
 
@@ -311,6 +312,15 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             _required_arg(args, "project_id"),
             case_ids=(
                 _optional_string_list_arg(args, "case_ids") if "case_ids" in args else None
+            ),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
+    if tool_name == "public_demo.run":
+        return core.run_public_demo(
+            _required_arg(args, "project_name"),
+            question_category=(
+                _optional_string_arg(args, "question_category") or "budget_vs_actuals"
             ),
             dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
             offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
