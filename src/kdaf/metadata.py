@@ -30,7 +30,7 @@ def package_metadata() -> PackageMetadata:
     try:
         version = importlib_metadata.version("kdaf")
     except importlib_metadata.PackageNotFoundError:
-        version = "0.5.0"
+        version = "0.6.0"
     return PackageMetadata(name="kdaf", version=version)
 
 
