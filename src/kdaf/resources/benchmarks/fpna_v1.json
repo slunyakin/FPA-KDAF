@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "kdaf:fpna_benchmark:v1",
+  "name": "KDAF FP&A Public Benchmark v1",
+  "description": "Deterministic starter benchmark for retrieval, evidence, grounded answers, provenance, and refusal.",
+  "rubric": {
+    "case_pass": "Every expected evidence criterion and expected answer behavior passes.",
+    "suite_pass": "Every selected benchmark case passes.",
+    "error_behavior": "Execution errors are persisted with a stable code and message and do not abort the suite."
+  },
+  "cases": [
+    {
+      "id": "fpna:variance",
+      "category": "variance",
+      "question_text": "Which accounts or departments have the largest actual-to-budget variance?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:variance", "scenario:actual", "scenario:budget"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:budget_vs_actuals",
+      "category": "budget_vs_actuals",
+      "question_text": "Where is actual revenue above or below budget by month?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:budget_vs_actuals", "account:revenue"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:forecast",
+      "category": "forecast_movement",
+      "question_text": "How has the revenue forecast moved compared with actuals?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:forecast_movement", "scenario:forecast"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:department_spend",
+      "category": "department_spend",
+      "question_text": "Which departments are driving operating expense spend this month?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:department_spend", "department:engineering"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:revenue_driver",
+      "category": "revenue_driver",
+      "question_text": "What starter drivers should explain revenue performance?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:revenue_driver", "account:revenue", "account:headcount"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:provenance_heavy",
+      "category": "budget_vs_actuals",
+      "question_text": "Where is actual revenue above or below budget by month?",
+      "expected_answer_status": "grounded",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:budget_vs_actuals", "scenario:actual", "scenario:budget"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    },
+    {
+      "id": "fpna:unsupported_claim_refusal",
+      "category": "budget_vs_actuals",
+      "question_text": "Where is actual revenue above or below budget by month?",
+      "requested_claim": "What was the unsupported cash balance?",
+      "expected_answer_status": "insufficiently_supported",
+      "expected_evidence": {
+        "required_graph_concepts": ["metric:budget_vs_actuals"],
+        "financial_facts": true,
+        "provenance": true,
+        "validation_state": true
+      }
+    }
+  ]
+}

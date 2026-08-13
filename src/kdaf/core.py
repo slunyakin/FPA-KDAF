@@ -13,6 +13,11 @@ from kdaf.answers import (
     OllamaProvider,
     OpenAICompatibleProvider,
 )
+from kdaf.benchmark import (
+    BenchmarkError,
+    fpna_benchmark_catalog,
+    grade_benchmark_case,
+)
 from kdaf.config import KdafConfig, load_config
 from kdaf.evaluation import grade_evaluation_case
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
@@ -667,6 +672,111 @@ class KdafCore:
             return self.metadata.get_evaluation_result(result_id).to_dict()
         except MetadataError as exc:
             raise _core_metadata_error(exc) from exc
+
+    def fpna_benchmark_catalog(self) -> dict[str, Any]:
+        try:
+            return fpna_benchmark_catalog().to_dict()
+        except BenchmarkError as exc:
+            raise KdafError(str(exc), exc.code) from exc
+
+    def run_fpna_benchmark(
+        self,
+        project_id: str,
+        *,
+        case_ids: list[str] | None = None,
+        dwh_store_path: str | Path | None = None,
+        offline_graph: bool = False,
+    ) -> dict[str, Any]:
+        """Run the public FP&A benchmark and persist its per-case evidence."""
+
+        try:
+            project = self.metadata.get_project(project_id)
+            catalog = fpna_benchmark_catalog()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+        except BenchmarkError as exc:
+            raise KdafError(str(exc), exc.code) from exc
+        cases = list(catalog.cases)
+        if case_ids is not None:
+            if not isinstance(case_ids, list) or not all(
+                isinstance(item, str) and item.strip() for item in case_ids
+            ):
+                raise KdafError("case_ids must be a list of non-empty strings", "invalid_input")
+            selected_ids = set(case_ids)
+            cases = [case for case in cases if case.id in selected_ids]
+            missing = sorted(selected_ids - {case.id for case in cases})
+            if missing:
+                raise KdafError(f"Benchmark case not found: {missing[0]}", "not_found")
+        if not cases:
+            raise KdafError("No benchmark cases selected", "missing_field")
+
+        questions = {
+            question.question_text: question
+            for question in self.metadata.list_competency_questions(project.id)
+        }
+        run = self.metadata.create_run(project.id, "benchmarking")
+        results = []
+        for benchmark_case in cases:
+            try:
+                question = questions.get(benchmark_case.question_text)
+                if question is None:
+                    raise KdafError(
+                        f"Benchmark competency question not found: {benchmark_case.category}",
+                        "not_found",
+                    )
+                packet = self.build_evidence_packet(
+                    question.id,
+                    run.id,
+                    dwh_store_path=dwh_store_path,
+                    offline_graph=offline_graph,
+                )
+                answer = self.generate_grounded_answer(
+                    packet, requested_claim=benchmark_case.requested_claim
+                )
+                metrics = grade_benchmark_case(benchmark_case, packet, answer)
+                status = "passed" if metrics["passed"] else "failed"
+                result = self.metadata.create_evaluation_result(
+                    run.id,
+                    benchmark_case.id,
+                    status,
+                    metrics,
+                    {
+                        "benchmark_id": catalog.benchmark_id,
+                        "benchmark_case_id": benchmark_case.id,
+                        "competency_question_id": question.id,
+                        "evidence_packet_id": packet["id"],
+                        "answer_status": answer["status"],
+                    },
+                )
+            except KdafError as exc:
+                result = self.metadata.create_evaluation_result(
+                    run.id,
+                    benchmark_case.id,
+                    "error",
+                    {"passed": False},
+                    {
+                        "benchmark_id": catalog.benchmark_id,
+                        "benchmark_case_id": benchmark_case.id,
+                    },
+                    {"code": exc.code, "message": exc.message},
+                )
+            results.append(result.to_dict())
+        passed = sum(result["status"] == "passed" for result in results)
+        return {
+            "benchmark": {
+                "id": catalog.benchmark_id,
+                "name": catalog.name,
+                "schema_version": catalog.schema_version,
+            },
+            "run": run.to_dict(),
+            "status": "passed" if passed == len(results) else "failed",
+            "summary": {
+                "total": len(results),
+                "passed": passed,
+                "failed": len(results) - passed,
+            },
+            "results": results,
+        }
 
     def _default_starter_dwh_path(self) -> Path:
         return self.metadata.store_path.parent / "starter_dwh.sqlite3"

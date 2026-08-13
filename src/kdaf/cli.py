@@ -254,6 +254,13 @@ def build_parser() -> argparse.ArgumentParser:
     evaluation_list.add_argument("--run-id")
     evaluation_get = evaluation_subparsers.add_parser("get", help="Read an evaluation result")
     evaluation_get.add_argument("id")
+    evaluation_subparsers.add_parser("catalog", help="Print the public FP&A benchmark")
+    benchmark_run = evaluation_subparsers.add_parser(
+        "benchmark", help="Run the public FP&A benchmark"
+    )
+    benchmark_run.add_argument("project_id")
+    benchmark_run.add_argument("--case-id", action="append")
+    benchmark_run.add_argument("--offline-graph", action="store_true")
 
     return parser
 
@@ -351,6 +358,15 @@ def _dispatch(args: argparse.Namespace) -> Any:
             return core.list_evaluation_results(args.run_id)
         if args.eval_command == "get":
             return core.get_evaluation_result(args.id)
+        if args.eval_command == "catalog":
+            return core.fpna_benchmark_catalog()
+        if args.eval_command == "benchmark":
+            return core.run_fpna_benchmark(
+                args.project_id,
+                case_ids=args.case_id,
+                dwh_store_path=args.dwh_store,
+                offline_graph=args.offline_graph,
+            )
         raise KdafError(f"Unknown eval command: {args.eval_command}")
     raise KdafError(f"Unknown command: {args.command}")
 

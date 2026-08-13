@@ -56,6 +56,8 @@ TOOL_NAMES = (
     "eval.run",
     "eval.list",
     "eval.get",
+    "eval.catalog",
+    "eval.benchmark",
 )
 
 
@@ -302,6 +304,17 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.list_evaluation_results(_optional_string_arg(args, "run_id"))
     if tool_name == "eval.get":
         return core.get_evaluation_result(_required_arg(args, "id"))
+    if tool_name == "eval.catalog":
+        return core.fpna_benchmark_catalog()
+    if tool_name == "eval.benchmark":
+        return core.run_fpna_benchmark(
+            _required_arg(args, "project_id"),
+            case_ids=(
+                _optional_string_list_arg(args, "case_ids") if "case_ids" in args else None
+            ),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 

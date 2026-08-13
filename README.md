@@ -269,6 +269,18 @@ printf '%s\n' \
 Neo4j. Financial facts are always read from the separate DWH and are never persisted in Neo4j or in
 evaluation metadata.
 
+Run the public FP&A benchmark baseline:
+
+```bash
+kdaf --metadata-store .kdaf/v06-metadata.sqlite3 \
+  --dwh-store .kdaf/v06-financial-dwh.sqlite3 \
+  eval benchmark <project-id> --offline-graph
+```
+
+Use `kdaf eval catalog` to inspect its seven versioned cases and rubric. See the
+[FP&A benchmark guide](docs/fpna-benchmark-v0.6.md) for coverage, expected evidence, grading, and
+case selection. The matching agent tools are `eval.catalog` and `eval.benchmark`.
+
 ## v0.4 Extraction and Validation Demo
 
 The source-to-review vertical slice uses the sample file at `examples/v04_actuals.csv`. Choose
