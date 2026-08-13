@@ -233,6 +233,42 @@ Tool-server success responses use `{"ok": true, "result": ...}`. Errors use
 `{"ok": false, "error": {"code": "...", "message": "..."}}`, including malformed JSON lines and
 invalid tool requests.
 
+## v0.6 Evaluation Harness
+
+After creating a project and loading the starter kit, run all starter-question evaluations with the
+same local metadata and financial DWH stores:
+
+```bash
+kdaf \
+  --metadata-store .kdaf/v06-metadata.sqlite3 \
+  --dwh-store .kdaf/v06-financial-dwh.sqlite3 \
+  eval run <project-id> --offline-graph
+```
+
+The runner evaluates retrieval context, grounded financial evidence, provenance completeness,
+answer citations, unsupported-claim refusal, and graph validation state. Every case is stored in the
+metadata database. A failed case has `status: "error"` and a stable `error` object; it does not stop
+the remaining cases.
+
+Inspect stored results:
+
+```bash
+kdaf --metadata-store .kdaf/v06-metadata.sqlite3 eval list --run-id <run-id>
+kdaf --metadata-store .kdaf/v06-metadata.sqlite3 eval get <evaluation-result-id>
+```
+
+Agents use the same core service through `eval.run`, `eval.list`, and `eval.get`:
+
+```bash
+printf '%s\n' \
+  '{"tool":"eval.run","arguments":{"project_id":"<project-id>","dwh_store_path":".kdaf/v06-financial-dwh.sqlite3","offline_graph":true}}' \
+  | kdaf-tool-server --metadata-store .kdaf/v06-metadata.sqlite3
+```
+
+`--offline-graph` uses the packaged semantic seed for repeatable local evaluation. Omit it to query
+Neo4j. Financial facts are always read from the separate DWH and are never persisted in Neo4j or in
+evaluation metadata.
+
 ## v0.4 Extraction and Validation Demo
 
 The source-to-review vertical slice uses the sample file at `examples/v04_actuals.csv`. Choose

@@ -14,6 +14,7 @@ from kdaf.answers import (
     OpenAICompatibleProvider,
 )
 from kdaf.config import KdafConfig, load_config
+from kdaf.evaluation import grade_evaluation_case
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
 from kdaf.graph import GraphError, GraphProvenanceRepository
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
@@ -568,6 +569,104 @@ class KdafCore:
                 ],
             },
         }
+
+    def run_evaluation(
+        self,
+        project_id: str,
+        *,
+        question_ids: list[str] | None = None,
+        dwh_store_path: str | Path | None = None,
+        offline_graph: bool = False,
+    ) -> dict[str, Any]:
+        """Evaluate starter questions and persist every case in framework metadata."""
+
+        try:
+            project = self.metadata.get_project(project_id)
+            questions = self.metadata.list_competency_questions(project.id)
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+        if question_ids is not None:
+            if not isinstance(question_ids, list) or not all(
+                isinstance(item, str) and item.strip() for item in question_ids
+            ):
+                raise KdafError(
+                    "question_ids must be a list of non-empty strings", "invalid_input"
+                )
+            selected_ids = set(question_ids)
+            selected = [question for question in questions if question.id in selected_ids]
+            missing = sorted(selected_ids - {question.id for question in selected})
+            if missing:
+                raise KdafError(f"Competency question not found: {missing[0]}", "not_found")
+            questions = selected
+        if not questions:
+            raise KdafError("No competency questions found for evaluation", "not_found")
+
+        run = self.metadata.create_run(project.id, "evaluating")
+        results = []
+        for question in questions:
+            try:
+                starter_question_for_text(question.question_text)
+                packet = self.build_evidence_packet(
+                    question.id,
+                    run.id,
+                    dwh_store_path=dwh_store_path,
+                    offline_graph=offline_graph,
+                )
+                answer = self.generate_grounded_answer(packet)
+                refusal = self.generate_grounded_answer(
+                    packet,
+                    requested_claim="What was the unsupported cash balance?",
+                )
+                metrics = grade_evaluation_case(packet, answer, refusal)
+                status = "passed" if metrics["passed"] else "failed"
+                result = self.metadata.create_evaluation_result(
+                    run.id,
+                    question.id,
+                    status,
+                    metrics,
+                    {
+                        "competency_question_id": question.id,
+                        "evidence_packet_id": packet["id"],
+                        "answer_status": answer["status"],
+                        "refusal_status": refusal["status"],
+                    },
+                )
+            except KdafError as exc:
+                result = self.metadata.create_evaluation_result(
+                    run.id,
+                    question.id,
+                    "error",
+                    {"passed": False},
+                    {"competency_question_id": question.id},
+                    {"code": exc.code, "message": exc.message},
+                )
+            results.append(result.to_dict())
+
+        passed = sum(result["status"] == "passed" for result in results)
+        return {
+            "run": run.to_dict(),
+            "status": "passed" if passed == len(results) else "failed",
+            "summary": {
+                "total": len(results),
+                "passed": passed,
+                "failed": len(results) - passed,
+            },
+            "results": results,
+        }
+
+    def list_evaluation_results(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        try:
+            return [
+                result.to_dict() for result in self.metadata.list_evaluation_results(run_id)
+            ]
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
+
+    def get_evaluation_result(self, result_id: str) -> dict[str, Any]:
+        try:
+            return self.metadata.get_evaluation_result(result_id).to_dict()
+        except MetadataError as exc:
+            raise _core_metadata_error(exc) from exc
 
     def _default_starter_dwh_path(self) -> Path:
         return self.metadata.store_path.parent / "starter_dwh.sqlite3"

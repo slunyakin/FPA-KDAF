@@ -53,6 +53,9 @@ TOOL_NAMES = (
     "evidence.build",
     "answer.generate",
     "grounded_answer.demo",
+    "eval.run",
+    "eval.list",
+    "eval.get",
 )
 
 
@@ -284,6 +287,21 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
             offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
         )
+    if tool_name == "eval.run":
+        return core.run_evaluation(
+            _required_arg(args, "project_id"),
+            question_ids=(
+                _optional_string_list_arg(args, "question_ids")
+                if "question_ids" in args
+                else None
+            ),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=False),
+        )
+    if tool_name == "eval.list":
+        return core.list_evaluation_results(_optional_string_arg(args, "run_id"))
+    if tool_name == "eval.get":
+        return core.get_evaluation_result(_required_arg(args, "id"))
     raise KdafError(f"Unknown tool: {tool_name}", code="unknown_tool")
 
 

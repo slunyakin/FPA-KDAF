@@ -244,6 +244,17 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("run_id")
     demo.add_argument("--offline-graph", action="store_true")
 
+    evaluation = subparsers.add_parser("eval", help="Run and inspect FP&A evaluations")
+    evaluation_subparsers = evaluation.add_subparsers(dest="eval_command", required=True)
+    evaluation_run = evaluation_subparsers.add_parser("run", help="Evaluate starter questions")
+    evaluation_run.add_argument("project_id")
+    evaluation_run.add_argument("--question-id", action="append")
+    evaluation_run.add_argument("--offline-graph", action="store_true")
+    evaluation_list = evaluation_subparsers.add_parser("list", help="List evaluation results")
+    evaluation_list.add_argument("--run-id")
+    evaluation_get = evaluation_subparsers.add_parser("get", help="Read an evaluation result")
+    evaluation_get.add_argument("id")
+
     return parser
 
 
@@ -328,6 +339,19 @@ def _dispatch(args: argparse.Namespace) -> Any:
             dwh_store_path=args.dwh_store,
             offline_graph=args.offline_graph,
         )
+    if args.command == "eval":
+        if args.eval_command == "run":
+            return core.run_evaluation(
+                args.project_id,
+                question_ids=args.question_id,
+                dwh_store_path=args.dwh_store,
+                offline_graph=args.offline_graph,
+            )
+        if args.eval_command == "list":
+            return core.list_evaluation_results(args.run_id)
+        if args.eval_command == "get":
+            return core.get_evaluation_result(args.id)
+        raise KdafError(f"Unknown eval command: {args.eval_command}")
     raise KdafError(f"Unknown command: {args.command}")
 
 
