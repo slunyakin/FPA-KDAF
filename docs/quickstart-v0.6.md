@@ -60,6 +60,7 @@ The evaluation record contains IDs and boolean grades. Financial values remain i
 - [FP&A benchmark](fpna-benchmark-v0.6.md): seven public cases and grading rubric
 - [Release readiness](release-readiness-v0.6.md): test baseline, Docker status, and limitations
 - [Architecture](architecture-v0.6.md): storage ownership and shared service flow
+- [Six-stage approach](six-stage-approach.md): why KDAF is needed and how the methodology works
 - [Role-based guide](role-based-consumer-guide.md): adoption paths by responsibility
 
 To use live Neo4j, start it with `docker compose up -d --wait neo4j` and omit `--offline-graph`.

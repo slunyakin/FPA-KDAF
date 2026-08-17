@@ -5,6 +5,7 @@ that matches your goal:
 
 | Goal | Start here | Evidence produced |
 | --- | --- | --- |
+| Understand the problem and method | [Six-stage approach](six-stage-approach.md) | Purpose, iterative workflow, implementation mapping, and variance-analysis example |
 | Prove it works from a fresh clone | [Quickstart](quickstart-v0.6.md) | Passing smoke tests, cited answer, refusal, stored evaluation result |
 | Watch the complete workflow | [Public demo](public-demo-v0.6.md) | Project, starter kit, CARP context, evidence packet, answer, evaluation metadata |
 | Compare repeatable finance behavior | [FP&A benchmark](fpna-benchmark-v0.6.md) | Seven graded cases covering finance and refusal behavior |

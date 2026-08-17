@@ -12,6 +12,32 @@ KDAF separates meaning from measures:
 
 Financial numbers must not be stored in the graph. The graph explains what financial data means and how concepts relate; the DWH stores the numeric values used for analysis.
 
+## Why the Framework Is Needed
+
+In finance, a fluent answer is not enough. Planning and variance explanations must be grounded in
+authoritative numbers, interpreted through shared business definitions, and reconstructable for
+review. Warehouse schemas locate data but do not capture all of its meaning. Flat retrieval can rank
+documents but does not provide a typed reasoning path, validation state, or end-to-end provenance.
+
+KDAF turns that trust problem into a six-stage, iterative implementation path:
+
+```mermaid
+flowchart LR
+    S1["1. Scope the business problem"] --> S2["2. Bootstrap a Minimum Viable Graph"]
+    S2 --> S3["3. Extract knowledge under schema constraints"]
+    S3 --> S4["4. Represent context and provenance"]
+    S4 --> S5["5. Validate with automation and experts"]
+    S5 --> S6["6. Retrieve focused context with CARP"]
+    S6 --> O["Cited answer or explicit refusal with an audit trail"]
+    S5 -. "feedback" .-> S2
+```
+
+The framework is the practical implementation of this approach: competency questions and MVGs
+bound the problem; governed extraction and validation build trustworthy context; CARP and the
+separate financial DWH produce evidence-backed answers without storing financial numbers in Neo4j.
+Read [the six-stage approach](docs/six-stage-approach.md) for the rationale, outputs, implementation
+mapping, and a variance-analysis example.
+
 ## Architecture
 
 The local runtime contains three backing services plus dependency-free local adapters used by the
