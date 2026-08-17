@@ -4,6 +4,10 @@ KDAF separates semantic meaning, workflow metadata, and financial measures. Ever
 calls shared `KdafCore` services, so the CLI, JSON-line tool server, and scripts apply the same
 validation, provenance, evaluation, and error behavior.
 
+The architecture operationalizes KDAF's
+[six-stage knowledge-building approach](six-stage-approach.md), beginning with competency questions
+and an MVG and ending with CARP retrieval, cited evidence, or an explicit refusal.
+
 ```mermaid
 flowchart LR
     CLI["Operator CLI"] --> Core["Shared KdafCore services"]
