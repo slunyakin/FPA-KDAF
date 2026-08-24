@@ -467,6 +467,46 @@ pytest -m "not integration"
 pytest -m integration
 ```
 
+## Research and Evaluation
+
+The methodology is described in Lunyakin, S., *Auditable by Construction: An Ontology-Driven
+Framework for Trustworthy LLM Analytics in Enterprise Finance*,
+[arXiv:2608.20661](https://doi.org/10.48550/arXiv.2608.20661). The companion
+[reproduction artifacts](https://doi.org/10.5281/zenodo.22022068) are deposited on Zenodo
+under DOI `10.5281/zenodo.22022068` and include the ontology schema, configuration, prompts,
+evaluation split, environment report, audit artifacts, and scripts to reproduce the reported run.
+
+The paper evaluates the methodology and its experimental implementation. This repository is a
+distinct reference implementation, not the system evaluated in the paper. It currently implements
+the deterministic governed profile of CARP: curated seed resolution over a validated minimum viable
+graph, with provenance and validation context attached. It does not yet perform weighted propagation
+or dynamic boundary detection. Those capabilities define the generalized propagation profile—the
+algorithm evaluated in the paper—and are staged additions. A third profile, budgeted assembly, is
+planned after that.
+
+On FinanceBench answer correctness, the approach was statistically indistinguishable from BM25
+sparse retrieval; structured retrieval did not improve accuracy in that setting. On citation
+traceability, the ontology-grounded condition scored highest of all conditions tested, with
+confidence intervals excluding zero against both BM25 and an ungrounded graph baseline.
+Auditability, not accuracy, is where this architecture earns its cost.
+
+KDAF grew out of the
+[financial-KDAF research repository](https://github.com/slunyakin/financial-KDAF), its prototyping
+predecessor.
+
+```bibtex
+@misc{lunyakin2026auditable,
+  author = {Lunyakin, Sergiy},
+  title = {Auditable by Construction: An Ontology-Driven Framework for Trustworthy {LLM} Analytics
+           in Enterprise Finance},
+  year = {2026},
+  eprint = {2608.20661},
+  archivePrefix = {arXiv},
+  doi = {10.48550/arXiv.2608.20661},
+  url = {https://doi.org/10.48550/arXiv.2608.20661}
+}
+```
+
 ## Project Status
 
 KDAF v0.6.0 adds repeatable evaluation, a versioned seven-case FP&A benchmark, an adoption-ready
