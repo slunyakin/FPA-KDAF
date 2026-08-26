@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kdaf"
-version = "0.6.0"
+dynamic = ["version"]
 description = "Knowledge-Driven Analytics Framework for finance-focused semantic context and financial data warehousing."
-readme = "README.md"
-requires-python = ">=3.11"
+readme = "PYPI.md"
+requires-python = ">=3.11,<3.15"
 license = "MIT"
 authors = [
   { name = "KDAF Contributors" }
@@ -20,27 +20,46 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Database",
   "Topic :: Office/Business :: Financial",
 ]
-dependencies = [
-  "neo4j>=5.25,<6",
-  "psycopg[binary]>=3.2,<4",
-]
+dependencies = []
 
 [project.scripts]
 kdaf = "kdaf.cli:main"
 kdaf-tool-server = "kdaf.tool_server:main"
 
 [project.optional-dependencies]
+neo4j = [
+  "neo4j>=5.25,<6",
+]
+postgres = [
+  "psycopg[binary]>=3.2,<4",
+]
+all = [
+  "neo4j>=5.25,<6",
+  "psycopg[binary]>=3.2,<4",
+]
 dev = [
+  "build>=1.2",
+  "neo4j>=5.25,<6",
   "pytest>=8.0",
+  "psycopg[binary]>=3.2,<4",
   "ruff>=0.5",
+  "twine>=5.1",
 ]
 
 [project.urls]
 Homepage = "https://github.com/slunyakin/FPA-KDAF"
+Source = "https://github.com/slunyakin/FPA-KDAF"
+Documentation = "https://github.com/slunyakin/FPA-KDAF/tree/main/docs"
+Changelog = "https://github.com/slunyakin/FPA-KDAF/tree/main/docs/releases"
 Issues = "https://github.com/slunyakin/FPA-KDAF/issues"
+
+[tool.hatch.version]
+path = "src/kdaf/_version.py"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
@@ -65,3 +84,26 @@ indent-style = "space"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kdaf"]
+exclude = [
+  "**/__pycache__",
+  "**/*.pyc",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/LICENSE",
+  "/PYPI.md",
+  "/pyproject.toml",
+  "/src/kdaf",
+]
+exclude = [
+  "/AGENTS.md",
+  "/docs/carp-manuscript-guidance.md",
+  "/.env",
+  "/.kdaf",
+  "/.venv",
+  "/dist",
+  "/build",
+  "**/__pycache__",
+  "**/*.pyc",
+]

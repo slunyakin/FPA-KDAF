@@ -80,7 +80,7 @@ class StarterGraphRepository:
             from neo4j import GraphDatabase
         except ImportError as exc:
             raise StarterGraphError(
-                "Neo4j driver is not installed. Install the project dependencies and retry."
+                "Neo4j driver is not installed. Install 'kdaf[neo4j]' and retry."
             ) from exc
 
         try:

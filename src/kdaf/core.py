@@ -788,6 +788,10 @@ class KdafCore:
     ) -> dict[str, Any]:
         """Run the adoption-ready project-to-evaluation vertical slice."""
 
+        resolved_dwh_store_path = dwh_store_path
+        if offline_graph and resolved_dwh_store_path is None:
+            resolved_dwh_store_path = self._default_starter_dwh_path()
+
         try:
             catalog_question = next(
                 question
@@ -804,7 +808,7 @@ class KdafCore:
         )
         starter_kit = self.load_starter_kit(
             project["id"],
-            dwh_store_path=dwh_store_path,
+            dwh_store_path=resolved_dwh_store_path,
             include_graph=not offline_graph,
         )
         questions = self.list_competency_questions(project["id"])
@@ -818,7 +822,7 @@ class KdafCore:
         packet = self.build_evidence_packet(
             question["id"],
             run["id"],
-            dwh_store_path=dwh_store_path,
+            dwh_store_path=resolved_dwh_store_path,
             offline_graph=offline_graph,
         )
         answer = self.generate_grounded_answer(packet)

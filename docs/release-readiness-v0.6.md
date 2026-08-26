@@ -27,6 +27,7 @@ fresh-clone quickstart, architecture documentation, and consolidated adoption na
 | Secret/config leakage checks | Pass | Provider/config failures return bounded errors without credentials or traces |
 | Optional live Docker smoke | Not run | 3 tests skipped cleanly: Docker daemon unavailable |
 | Final v0.6 packaging | Pass | Version `0.6.0`, release notes, quickstart, architecture, and adoption index published |
+| PyPI artifact preparation | Pending final release run | Dedicated description, optional extras, archive checks, installed-package smoke, and Trusted Publishing workflow are implemented by KDAF-035; TestPyPI/PyPI upload requires maintainer environment setup |
 
 Commands executed for this report:
 
@@ -42,6 +43,29 @@ ruff check .
 
 The full suite and lint are rerun on every issue branch before commit. Docker tests are designed to
 skip rather than fail when Docker is unavailable.
+
+The PyPI-specific release path and external maintainer gates are documented in
+[the PyPI installation guide](pypi-installation.md). A readiness update must record the final index
+URL, pinned version, supported Python matrix, and clean index-install demo before changing the PyPI
+gate above to `Pass`.
+
+## PyPI preparation evidence
+
+Evidence date: 2026-08-25
+
+- Ruff passed and the full local suite reported 171 passed with 3 clean Docker-unavailable skips.
+- The protected repository README matched its recorded SHA-256 baseline.
+- Hatch built `kdaf-0.6.0.tar.gz` and `kdaf-0.6.0-py3-none-any.whl` from the explicit package boundary.
+- Both artifacts passed `twine check` and the KDAF archive-content verifier.
+- Clean Python 3.14 environments installed and exercised both the wheel and sdist without runtime
+  dependencies: import/version metadata, packaged resources, both console commands, offline public
+  demo, citation/refusal behavior, evaluation persistence, and actionable missing-extra errors passed.
+- Release workflows require the same wheel and sdist to pass clean-install smoke tests on Python
+  3.11, 3.12, 3.13, and 3.14 before either publishing job can run.
+- The PyPI JSON endpoint for `kdaf` returned HTTP 404 at verification time; availability must be
+  checked again at the first upload.
+- TestPyPI/PyPI Trusted Publisher registration, protected-environment approval, index installation,
+  and the public release URL remain pending maintainer actions.
 
 ## Benchmark baseline
 

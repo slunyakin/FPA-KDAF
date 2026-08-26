@@ -13,3 +13,10 @@ Do not open a public issue for secrets, credential exposure, privilege escalatio
 ## Local Development Secrets
 
 The credentials in `.env.example` and `config/kdaf.example.toml` are development placeholders. Replace them before using KDAF with any non-local data or shared environment.
+
+## Package Publication
+
+KDAF package publication uses PyPI Trusted Publishing with GitHub OIDC and protected environments.
+Do not add long-lived PyPI API tokens to repository or environment secrets. Release artifacts must be
+built once, validated, and published without rebuilding. A live adapter selected without its optional
+driver returns the corresponding installation extra without returning connection settings or secrets.
