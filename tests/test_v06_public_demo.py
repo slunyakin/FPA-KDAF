@@ -95,6 +95,36 @@ def test_public_demo_cli_public_entrypoint_valid_and_malformed(tmp_path) -> None
     assert json.loads(output.getvalue())["error"]["code"] == "invalid_arguments"
 
 
+def test_public_demo_cli_uses_safe_local_defaults_without_repository(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output = StringIO()
+
+    code = cli_main(["public-demo", "Installed Package Demo", "--offline-graph"], output)
+    payload = json.loads(output.getvalue())
+
+    assert code == 0
+    assert payload["answer"]["status"] == "grounded"
+    assert payload["unsupported_claim"]["status"] == "insufficiently_supported"
+    assert payload["evaluation_result"]["status"] == "passed"
+    assert (tmp_path / ".kdaf" / "metadata.sqlite3").is_file()
+    assert (tmp_path / ".kdaf" / "starter_dwh.sqlite3").is_file()
+
+
+def test_public_demo_safe_defaults_append_runs_without_overwriting(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    core = KdafCore()
+
+    first = core.run_public_demo("Repeatable Demo", offline_graph=True)
+    second = core.run_public_demo("Repeatable Demo", offline_graph=True)
+
+    assert first["project"]["id"] != second["project"]["id"]
+    assert first["run"]["id"] != second["run"]["id"]
+    assert len(core.list_projects()) == 2
+    assert len(core.list_evaluation_results()) == 2
+
+
 def test_public_demo_tool_server_valid_negative_and_server_survival(tmp_path) -> None:
     metadata, dwh, graph = _paths(tmp_path)
     core = KdafCore(

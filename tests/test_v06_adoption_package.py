@@ -17,7 +17,12 @@ ADOPTION_DOCS = (
 def test_v06_package_version_is_aligned() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert project["project"]["version"] == "0.6.0"
+    version_file = Path(project["tool"]["hatch"]["version"]["path"]).read_text(
+        encoding="utf-8"
+    )
+
+    assert project["project"]["dynamic"] == ["version"]
+    assert '__version__ = "0.6.0"' in version_file
     assert kdaf.__version__ == "0.6.0"
 
 

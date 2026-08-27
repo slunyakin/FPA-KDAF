@@ -1,5 +1,6 @@
 """KDAF public package surface."""
 
+from kdaf._version import __version__
 from kdaf.answers import (
     AnswerError,
     GroundedAnswerService,
@@ -58,7 +59,6 @@ from kdaf.starter_questions import (
     starter_question_catalog,
 )
 
-__version__ = "0.6.0"
 __all__ = [
     "AnswerError",
     "AuditEvent",

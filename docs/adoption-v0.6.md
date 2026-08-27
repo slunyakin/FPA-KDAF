@@ -12,6 +12,7 @@ that matches your goal:
 | Review trust and maturity claims | [Release readiness](release-readiness-v0.6.md) | Test status, Docker status, architecture coverage, limitations, roadmap candidates |
 | Understand storage and interfaces | [Architecture](architecture-v0.6.md) | Store ownership, service flow, error contract, detailed contract links |
 | Map adoption to a team role | [Role-based guide](role-based-consumer-guide.md) | Analyst, finance leader, modeler, engineer, developer, auditor, operator paths |
+| Install a published package | [PyPI installation](pypi-installation.md) | Clean install, offline demo, optional integration, and release-gate instructions |
 
 ## Adoption boundary
 

@@ -199,7 +199,10 @@ class PostgresDwhQueryService:
         try:
             import psycopg
         except ImportError as exc:
-            raise RetrievalError("Postgres driver is not installed", "dwh_unavailable") from exc
+            raise RetrievalError(
+                "Postgres driver is not installed. Install 'kdaf[postgres]' and retry.",
+                "dwh_unavailable",
+            ) from exc
         started = perf_counter()
         try:
             with (
@@ -314,7 +317,10 @@ class Neo4jGraphContextProvider:
         try:
             from neo4j import GraphDatabase
         except ImportError as exc:
-            raise RetrievalError("Neo4j driver is not installed", "graph_unavailable") from exc
+            raise RetrievalError(
+                "Neo4j driver is not installed. Install 'kdaf[neo4j]' and retry.",
+                "graph_unavailable",
+            ) from exc
         try:
             with (
                 GraphDatabase.driver(

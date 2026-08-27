@@ -6,10 +6,11 @@ import json
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from kdaf._version import __version__
 
 SCHEMA_VERSION = 4
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
@@ -25,13 +26,9 @@ class PackageMetadata:
 
 
 def package_metadata() -> PackageMetadata:
-    """Return installed package metadata, falling back to source-tree defaults."""
+    """Return public package metadata from the distribution's version source."""
 
-    try:
-        version = importlib_metadata.version("kdaf")
-    except importlib_metadata.PackageNotFoundError:
-        version = "0.6.0"
-    return PackageMetadata(name="kdaf", version=version)
+    return PackageMetadata(name="kdaf", version=__version__)
 
 
 class MetadataError(ValueError):
