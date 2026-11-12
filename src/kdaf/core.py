@@ -23,6 +23,16 @@ from kdaf.evaluation import grade_evaluation_case
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
 from kdaf.graph import GraphError, GraphProvenanceRepository
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
+from kdaf.question_mapping import (
+    DeterministicQuestionMappingProposer,
+    MappingContextProvider,
+    Neo4jMappingContextProvider,
+    PackagedMappingContextProvider,
+    QuestionMappingError,
+    QuestionMappingProposer,
+    QuestionMappingService,
+    RecordedQuestionMappingProposer,
+)
 from kdaf.retrieval import (
     CarpRetrievalService,
     EvidencePacketBuilder,
@@ -223,6 +233,89 @@ class KdafCore:
             return self.metadata.add_concept_to_mvg(mvg_id, concept_id).to_dict()
         except MetadataError as exc:
             raise KdafError(str(exc), code=_metadata_error_code(exc)) from exc
+
+    def import_discovery_handoff(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return QuestionMappingService(self.metadata).import_handoff(project_id, payload)
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_discovery_handoff(self, handoff_id: str) -> dict[str, Any]:
+        try:
+            return QuestionMappingService(self.metadata).get_handoff(handoff_id)
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def list_discovery_handoffs(
+        self,
+        project_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return QuestionMappingService(self.metadata).list_handoffs(project_id)
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def create_graph_extension_proposal(
+        self,
+        handoff_id: str,
+        *,
+        offline_graph: bool = True,
+        proposer: QuestionMappingProposer | None = None,
+        proposal_payload: dict[str, Any] | None = None,
+        provider_name: str = "external",
+        model: str | None = None,
+    ) -> dict[str, Any]:
+        if proposer is not None and proposal_payload is not None:
+            raise KdafError(
+                "proposer and proposal_payload cannot both be supplied",
+                code="invalid_input",
+            )
+        selected_proposer = proposer
+        if selected_proposer is None and proposal_payload is not None:
+            selected_proposer = RecordedQuestionMappingProposer(
+                proposal=proposal_payload,
+                provider=provider_name,
+                model=model,
+            )
+        if selected_proposer is None:
+            selected_proposer = DeterministicQuestionMappingProposer()
+        context_provider: MappingContextProvider = (
+            PackagedMappingContextProvider()
+            if offline_graph
+            else Neo4jMappingContextProvider(self._neo4j_connection_settings())
+        )
+        try:
+            return QuestionMappingService(self.metadata).propose(
+                handoff_id,
+                proposer=selected_proposer,
+                context_provider=context_provider,
+            )
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_graph_extension_proposal(self, proposal_id: str) -> dict[str, Any]:
+        try:
+            return QuestionMappingService(self.metadata).get_proposal(proposal_id)
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def list_graph_extension_proposals(
+        self,
+        *,
+        project_id: str | None = None,
+        handoff_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return QuestionMappingService(self.metadata).list_proposals(
+                project_id=project_id,
+                handoff_id=handoff_id,
+            )
+        except QuestionMappingError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
 
     def register_source(
         self,
