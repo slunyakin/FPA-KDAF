@@ -44,9 +44,11 @@ from kdaf.retrieval import (
 )
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
+    FoundationInitializationSummary,
     Neo4jConnectionSettings,
     StarterGraphError,
     StarterGraphRepository,
+    finance_foundation_manifest,
     starter_graph_cypher_artifacts,
 )
 from kdaf.starter_kit import StarterKitLoadSummary, StarterKitService
@@ -71,6 +73,7 @@ __all__ = [
     "ExtractionDwhRepository",
     "ExtractionError",
     "EvidencePacketBuilder",
+    "FoundationInitializationSummary",
     "GraphProvenanceRepository",
     "KdafCore",
     "KdafConfig",
@@ -107,6 +110,7 @@ __all__ = [
     "ValidationItem",
     "__version__",
     "load_config",
+    "finance_foundation_manifest",
     "package_metadata",
     "run_starter_kit_demo",
     "starter_question_catalog",

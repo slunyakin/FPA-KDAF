@@ -109,7 +109,7 @@ def test_tool_server_exposes_starter_graph_schema(tmp_path) -> None:
 
 @pytest.mark.integration
 def test_starter_graph_loads_and_queries_real_neo4j(tmp_path) -> None:
-    pytest.importorskip("neo4j")
+    neo4j = pytest.importorskip("neo4j")
     docker = shutil.which("docker")
     if docker is None:
         pytest.skip("Docker CLI is not available")
@@ -135,6 +135,75 @@ def test_starter_graph_loads_and_queries_real_neo4j(tmp_path) -> None:
             metadata_store_path=tmp_path / "metadata.sqlite3",
         )
 
+        foundation_first = core.initialize_finance_foundation("neo4j")
+        foundation_plan = core.plan_finance_foundation("neo4j")
+        foundation_context = core.inspect_finance_foundation("neo4j")
+
+        assert foundation_first["status"] == "initialize"
+        assert foundation_first["concept_counts"] == {
+            "AccountConcept": 4,
+            "FinanceDomain": 1,
+            "MetricConcept": 4,
+            "ScenarioConcept": 3,
+        }
+        assert foundation_first["relationship_counts"] == {
+            "DEPENDS_ON": 11,
+            "HAS_CONCEPT": 11,
+        }
+        assert foundation_plan["action"] == "noop"
+        assert foundation_context["foundation_version"] == "1.0.0"
+        assert foundation_context["owned_concept_count"] == 12
+
+        settings = core._neo4j_connection_settings()
+        with (
+            neo4j.GraphDatabase.driver(
+                settings.uri,
+                auth=(settings.user, settings.password),
+            ) as driver,
+            driver.session(database=settings.database) as session,
+        ):
+            session.run(
+                """
+                MATCH (concept:SemanticConcept {id: 'account:revenue'})
+                SET concept.validation_state = 'reviewed',
+                    concept.review_note = 'project review survives initialization'
+                """
+            ).consume()
+            session.run(
+                """
+                MERGE (extension:ProjectExtension {id: 'project:test:extension'})
+                ON CREATE SET extension.name = 'Unmanaged project extension'
+                """
+            ).consume()
+
+        foundation_second = core.initialize_finance_foundation("neo4j")
+        assert foundation_second["status"] == "noop"
+
+        with (
+            neo4j.GraphDatabase.driver(
+                settings.uri,
+                auth=(settings.user, settings.password),
+            ) as driver,
+            driver.session(database=settings.database) as session,
+        ):
+            preserved = session.run(
+                """
+                MATCH (concept:SemanticConcept {id: 'account:revenue'})
+                MATCH (extension:ProjectExtension {id: 'project:test:extension'})
+                RETURN concept.validation_state AS state,
+                       concept.review_note AS note,
+                       extension.name AS extension_name
+                """
+            ).single()
+            binding_count = session.run(
+                "MATCH (:SemanticConcept)-[r:REFERENCES_DWH_DIMENSION]->() "
+                "RETURN count(r) AS count"
+            ).single()["count"]
+        assert preserved["state"] == "reviewed"
+        assert preserved["note"] == "project review survives initialization"
+        assert preserved["extension_name"] == "Unmanaged project extension"
+        assert binding_count == 0
+
         first = core.load_starter_graph()
         second = core.load_starter_graph()
         context = core.starter_graph_context()
@@ -150,6 +219,26 @@ def test_starter_graph_loads_and_queries_real_neo4j(tmp_path) -> None:
             "fpna_scenarios",
         }
         assert context["metric_dependencies"][0]["metric_id"] == "metric:budget_vs_actuals"
+
+        with (
+            neo4j.GraphDatabase.driver(
+                settings.uri,
+                auth=(settings.user, settings.password),
+            ) as driver,
+            driver.session(database=settings.database) as session,
+        ):
+            preserved_after_profile = session.run(
+                """
+                MATCH (concept:SemanticConcept {id: 'account:revenue'})
+                MATCH (extension:ProjectExtension {id: 'project:test:extension'})
+                RETURN concept.validation_state AS state,
+                       concept.review_note AS note,
+                       extension.name AS extension_name
+                """
+            ).single()
+        assert preserved_after_profile["state"] == "reviewed"
+        assert preserved_after_profile["note"] == "project review survives initialization"
+        assert preserved_after_profile["extension_name"] == "Unmanaged project extension"
     finally:
         subprocess.run(
             [docker, "compose", "-f", str(compose_file), "down"],

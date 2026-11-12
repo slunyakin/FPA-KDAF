@@ -122,6 +122,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     starter_dwh_facts.add_argument("--dwh-store", type=Path)
 
+    foundation = subparsers.add_parser(
+        "finance-foundation",
+        help="Initialize and inspect the versioned finance foundation",
+    )
+    foundation_subparsers = foundation.add_subparsers(
+        dest="foundation_command",
+        required=True,
+    )
+    foundation_subparsers.add_parser("manifest", help="Print the packaged foundation manifest")
+    for command, help_text in (
+        ("plan", "Plan initialization or a version transition without writing"),
+        ("initialize", "Safely initialize the selected Neo4j database"),
+    ):
+        operation = foundation_subparsers.add_parser(command, help=help_text)
+        operation.add_argument(
+            "--database",
+            required=True,
+            help="Expected Neo4j database; must match configuration",
+        )
+        operation.add_argument("--include-starter-profile", action="store_true")
+        operation.add_argument("--include-starter-bindings", action="store_true")
+    foundation_inspect = foundation_subparsers.add_parser(
+        "inspect",
+        help="Inspect installed foundation components",
+    )
+    foundation_inspect.add_argument(
+        "--database",
+        required=True,
+        help="Expected Neo4j database; must match configuration",
+    )
+
     starter_graph = subparsers.add_parser("starter-graph", help="Manage the FP&A starter graph")
     starter_graph_subparsers = starter_graph.add_subparsers(
         dest="starter_graph_command",
@@ -309,6 +340,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_mvg(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
+    if args.command == "finance-foundation":
+        return _dispatch_finance_foundation(core, args)
     if args.command == "starter-graph":
         return _dispatch_starter_graph(core, args)
     if args.command == "starter-questions":
@@ -447,6 +480,26 @@ def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.starter_dwh_command == "facts":
         return core.starter_dwh_sample_facts(dwh_store_path=args.dwh_store)
     raise KdafError(f"Unknown starter DWH command: {args.starter_dwh_command}")
+
+
+def _dispatch_finance_foundation(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.foundation_command == "manifest":
+        return core.finance_foundation_manifest()
+    if args.foundation_command == "plan":
+        return core.plan_finance_foundation(
+            args.database,
+            include_starter_profile=args.include_starter_profile,
+            include_starter_bindings=args.include_starter_bindings,
+        )
+    if args.foundation_command == "initialize":
+        return core.initialize_finance_foundation(
+            args.database,
+            include_starter_profile=args.include_starter_profile,
+            include_starter_bindings=args.include_starter_bindings,
+        )
+    if args.foundation_command == "inspect":
+        return core.inspect_finance_foundation(args.database)
+    raise KdafError(f"Unknown finance foundation command: {args.foundation_command}")
 
 
 def _dispatch_starter_graph(core: KdafCore, args: argparse.Namespace) -> Any:

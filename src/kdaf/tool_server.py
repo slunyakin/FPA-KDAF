@@ -30,6 +30,10 @@ TOOL_NAMES = (
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
+    "finance_foundation.manifest",
+    "finance_foundation.plan",
+    "finance_foundation.initialize",
+    "finance_foundation.inspect",
     "starter_graph.schema",
     "starter_graph.load",
     "starter_graph.inspect",
@@ -194,6 +198,30 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
         return core.load_starter_dwh(dwh_store_path=args.get("dwh_store_path"))
     if tool_name == "starter_dwh.facts":
         return core.starter_dwh_sample_facts(dwh_store_path=args.get("dwh_store_path"))
+    if tool_name == "finance_foundation.manifest":
+        return core.finance_foundation_manifest()
+    if tool_name == "finance_foundation.plan":
+        return core.plan_finance_foundation(
+            _required_arg(args, "database"),
+            include_starter_profile=_optional_bool_arg(
+                args, "include_starter_profile", default=False
+            ),
+            include_starter_bindings=_optional_bool_arg(
+                args, "include_starter_bindings", default=False
+            ),
+        )
+    if tool_name == "finance_foundation.initialize":
+        return core.initialize_finance_foundation(
+            _required_arg(args, "database"),
+            include_starter_profile=_optional_bool_arg(
+                args, "include_starter_profile", default=False
+            ),
+            include_starter_bindings=_optional_bool_arg(
+                args, "include_starter_bindings", default=False
+            ),
+        )
+    if tool_name == "finance_foundation.inspect":
+        return core.inspect_finance_foundation(_required_arg(args, "database"))
     if tool_name == "starter_graph.schema":
         return core.starter_graph_schema()
     if tool_name == "starter_graph.load":
