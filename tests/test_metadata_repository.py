@@ -137,6 +137,9 @@ def test_schema_contains_v02_extension_points(tmp_path) -> None:
         "kdaf_mvg_artifacts",
         "kdaf_mvg_questions",
         "kdaf_mvg_concepts",
+        "kdaf_discovery_handoffs",
+        "kdaf_graph_extension_proposals",
+        "kdaf_graph_extension_publications",
     } <= repository.table_names()
 
 
@@ -170,3 +173,9 @@ def test_v02_placeholder_schema_migrates_to_v04_without_data_loss(tmp_path) -> N
     assert source.locator == "old.csv"
     assert source.name == "Unnamed source"
     assert "kdaf_validation_decisions" in repository.table_names()
+    with sqlite3.connect(store) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(kdaf_validation_queue)")
+        }
+    assert "review_key" in columns

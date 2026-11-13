@@ -43,6 +43,11 @@ from kdaf.retrieval import (
     RetrievalError,
     starter_question_for_text,
 )
+from kdaf.semantic_publication import (
+    Neo4jGraphExtensionPublisher,
+    SemanticPublicationError,
+    SemanticPublicationService,
+)
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
     Neo4jConnectionSettings,
@@ -316,6 +321,116 @@ class KdafCore:
             )
         except QuestionMappingError as exc:
             raise KdafError(str(exc), code=exc.code) from exc
+
+    def review_graph_extension_proposal(
+        self,
+        proposal_id: str,
+        *,
+        decision: str,
+        reviewer: str,
+        reason: str,
+        purpose: str = "semantic_publication",
+    ) -> dict[str, Any]:
+        try:
+            return self._semantic_publication_service().review_proposal(
+                proposal_id,
+                decision=decision,
+                reviewer=reviewer,
+                reason=reason,
+                purpose=purpose,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_graph_extension_review(
+        self,
+        proposal_id: str,
+        *,
+        purpose: str = "semantic_publication",
+    ) -> dict[str, Any] | None:
+        try:
+            return self._semantic_publication_service().get_review(
+                proposal_id,
+                purpose=purpose,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def plan_graph_extension_publication(
+        self,
+        proposal_id: str,
+        expected_database: str,
+        *,
+        purpose: str = "semantic_publication",
+    ) -> dict[str, Any]:
+        try:
+            return self._semantic_publication_service().plan_publication(
+                proposal_id,
+                expected_database=expected_database,
+                purpose=purpose,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def publish_graph_extension_proposal(
+        self,
+        proposal_id: str,
+        expected_database: str,
+        *,
+        purpose: str = "semantic_publication",
+    ) -> dict[str, Any]:
+        try:
+            return self._semantic_publication_service().publish_proposal(
+                proposal_id,
+                expected_database=expected_database,
+                purpose=purpose,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_graph_extension_publication(self, publication_id: str) -> dict[str, Any]:
+        try:
+            return self._semantic_publication_service().get_publication(publication_id)
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def list_graph_extension_publications(
+        self,
+        *,
+        project_id: str | None = None,
+        proposal_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return self._semantic_publication_service().list_publications(
+                project_id=project_id,
+                proposal_id=proposal_id,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_published_question_scope(
+        self,
+        project_id: str,
+        expected_database: str,
+        *,
+        question_id: str | None = None,
+        graph_publication_id: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self._semantic_publication_service().question_scope(
+                project_id,
+                expected_database=expected_database,
+                question_id=question_id,
+                graph_publication_id=graph_publication_id,
+            )
+        except SemanticPublicationError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def _semantic_publication_service(self) -> SemanticPublicationService:
+        return SemanticPublicationService(
+            self.metadata,
+            Neo4jGraphExtensionPublisher(self._neo4j_connection_settings()),
+        )
 
     def register_source(
         self,

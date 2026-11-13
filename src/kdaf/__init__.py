@@ -24,6 +24,7 @@ from kdaf.metadata import (
     DiscoveryHandoffRecord,
     ExtractionBatch,
     GraphExtensionProposalRecord,
+    GraphExtensionPublicationRecord,
     MetadataError,
     MetadataRepository,
     MvgArtifact,
@@ -52,6 +53,13 @@ from kdaf.retrieval import (
     PostgresDwhQueryService,
     ReadOnlyDwhQueryService,
     RetrievalError,
+)
+from kdaf.semantic_publication import (
+    Neo4jGraphExtensionPublisher,
+    SemanticPublicationError,
+    SemanticPublicationService,
+    graph_extension_proposal_digest,
+    graph_extension_proposal_snapshot,
 )
 from kdaf.starter_dwh import StarterDwhError, StarterDwhRepository, starter_dwh_sql_artifacts
 from kdaf.starter_graph import (
@@ -88,6 +96,7 @@ __all__ = [
     "EvidencePacketBuilder",
     "FoundationInitializationSummary",
     "GraphProvenanceRepository",
+    "GraphExtensionPublicationRecord",
     "GraphExtensionProposalRecord",
     "KdafCore",
     "KdafConfig",
@@ -98,6 +107,7 @@ __all__ = [
     "Neo4jConfig",
     "Neo4jConnectionSettings",
     "Neo4jGraphContextProvider",
+    "Neo4jGraphExtensionPublisher",
     "Neo4jMappingContextProvider",
     "GroundedAnswerService",
     "OllamaProvider",
@@ -117,6 +127,8 @@ __all__ = [
     "RuntimeConfig",
     "Run",
     "Source",
+    "SemanticPublicationError",
+    "SemanticPublicationService",
     "StarterDwhError",
     "StarterDwhRepository",
     "StarterGraphError",
@@ -131,6 +143,8 @@ __all__ = [
     "__version__",
     "load_config",
     "finance_foundation_manifest",
+    "graph_extension_proposal_digest",
+    "graph_extension_proposal_snapshot",
     "package_metadata",
     "run_starter_kit_demo",
     "starter_question_catalog",

@@ -113,6 +113,6 @@ per-question additions.
 ## Publication boundary
 
 This service records draft proposals only. Review and publication are handled by
-the semantic lifecycle service from issue #59. A publisher must review the exact
-proposal version and base graph version; it must not reconstruct meaning from
-display text or execute proposer-authored Cypher.
+the [semantic publication workflow](semantic-publication.md). It reviews the exact
+proposal version, digest, purpose, and base graph version; it does not reconstruct
+meaning from display text or execute proposer-authored Cypher.
