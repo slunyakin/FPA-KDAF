@@ -139,6 +139,42 @@ def build_parser() -> argparse.ArgumentParser:
     graph_proposal_get.add_argument("id")
     graph_proposal_coverage = graph_proposal_subparsers.add_parser("coverage")
     graph_proposal_coverage.add_argument("id")
+    graph_proposal_review = graph_proposal_subparsers.add_parser("review")
+    graph_proposal_review.add_argument("id")
+    graph_proposal_review.add_argument(
+        "decision",
+        choices=("approved", "rejected"),
+    )
+    graph_proposal_review.add_argument("--reviewer", required=True)
+    graph_proposal_review.add_argument("--reason", required=True)
+    graph_proposal_review.add_argument("--purpose", default="semantic_publication")
+    graph_proposal_review_get = graph_proposal_subparsers.add_parser("review-get")
+    graph_proposal_review_get.add_argument("id")
+    graph_proposal_review_get.add_argument("--purpose", default="semantic_publication")
+
+    graph_publication = subparsers.add_parser(
+        "graph-publication",
+        help="Plan and publish reviewed graph extensions",
+    )
+    graph_publication_subparsers = graph_publication.add_subparsers(
+        dest="graph_publication_command",
+        required=True,
+    )
+    for command in ("plan", "publish"):
+        operation = graph_publication_subparsers.add_parser(command)
+        operation.add_argument("proposal_id")
+        operation.add_argument("--database", required=True)
+        operation.add_argument("--purpose", default="semantic_publication")
+    graph_publication_list = graph_publication_subparsers.add_parser("list")
+    graph_publication_list.add_argument("--project-id")
+    graph_publication_list.add_argument("--proposal-id")
+    graph_publication_get = graph_publication_subparsers.add_parser("get")
+    graph_publication_get.add_argument("id")
+    graph_publication_scope = graph_publication_subparsers.add_parser("question-scope")
+    graph_publication_scope.add_argument("project_id")
+    graph_publication_scope.add_argument("--database", required=True)
+    graph_publication_scope.add_argument("--question-id")
+    graph_publication_scope.add_argument("--publication-id")
 
     starter_dwh = subparsers.add_parser("starter-dwh", help="Manage the FP&A starter DWH")
     starter_dwh_subparsers = starter_dwh.add_subparsers(
@@ -380,6 +416,8 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_discovery_handoff(core, args)
     if args.command == "graph-proposal":
         return _dispatch_graph_proposal(core, args)
+    if args.command == "graph-publication":
+        return _dispatch_graph_publication(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
     if args.command == "finance-foundation":
@@ -556,7 +594,49 @@ def _dispatch_graph_proposal(core: KdafCore, args: argparse.Namespace) -> Any:
             "status": proposal["status"],
             "coverage": proposal["coverage"],
         }
+    if args.graph_proposal_command == "review":
+        return core.review_graph_extension_proposal(
+            args.id,
+            decision=args.decision,
+            reviewer=args.reviewer,
+            reason=args.reason,
+            purpose=args.purpose,
+        )
+    if args.graph_proposal_command == "review-get":
+        return core.get_graph_extension_review(args.id, purpose=args.purpose)
     raise KdafError(f"Unknown graph proposal command: {args.graph_proposal_command}")
+
+
+def _dispatch_graph_publication(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.graph_publication_command == "plan":
+        return core.plan_graph_extension_publication(
+            args.proposal_id,
+            args.database,
+            purpose=args.purpose,
+        )
+    if args.graph_publication_command == "publish":
+        return core.publish_graph_extension_proposal(
+            args.proposal_id,
+            args.database,
+            purpose=args.purpose,
+        )
+    if args.graph_publication_command == "list":
+        return core.list_graph_extension_publications(
+            project_id=args.project_id,
+            proposal_id=args.proposal_id,
+        )
+    if args.graph_publication_command == "get":
+        return core.get_graph_extension_publication(args.id)
+    if args.graph_publication_command == "question-scope":
+        return core.get_published_question_scope(
+            args.project_id,
+            args.database,
+            question_id=args.question_id,
+            graph_publication_id=args.publication_id,
+        )
+    raise KdafError(
+        f"Unknown graph publication command: {args.graph_publication_command}"
+    )
 
 
 def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:

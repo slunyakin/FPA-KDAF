@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from kdaf._version import __version__
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
 TERMINAL_VALIDATION_STATUSES = frozenset({"approved", "rejected"})
 
@@ -238,6 +238,29 @@ class GraphExtensionProposalRecord:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class GraphExtensionPublicationRecord:
+    id: str
+    proposal_id: str
+    project_id: str
+    proposal_version: int
+    database_name: str
+    graph_publication_id: str
+    proposal_digest: str
+    review_id: str
+    status: str
+    attempt_count: int
+    summary: dict[str, Any]
+    error_code: str | None
+    error_message: str | None
+    created_at: str
+    updated_at: str
+    published_at: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class MetadataRepository:
     """SQLite local adapter for framework, MVG, and audit workflow metadata."""
 
@@ -251,6 +274,12 @@ class MetadataRepository:
             _add_missing_columns(connection, "kdaf_source_registry", _source_migration_columns())
             _add_missing_columns(
                 connection, "kdaf_validation_queue", _validation_migration_columns()
+            )
+            connection.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_kdaf_validation_review_key
+                ON kdaf_validation_queue(review_key) WHERE review_key IS NOT NULL
+                """
             )
             _add_missing_columns(connection, "kdaf_audit_log", _audit_migration_columns())
             _add_missing_columns(connection, "kdaf_eval_results", _eval_migration_columns())
@@ -546,6 +575,302 @@ class MetadataRepository:
         with self._connect() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [_graph_extension_proposal_from_row(row) for row in rows]
+
+    def enqueue_graph_extension_review(
+        self,
+        proposal_id: str,
+        purpose: str,
+        payload: dict[str, Any],
+    ) -> ValidationItem:
+        proposal = self.get_graph_extension_proposal(proposal_id)
+        cleaned_purpose = _require_text("graph_review.purpose", purpose)
+        cleaned_payload = _require_object("graph_review.payload", payload)
+        if cleaned_payload.get("proposal_id") != proposal.id:
+            raise MetadataError("Graph review payload does not match proposal", "invalid_scope")
+        review_key = f"graph_extension_proposal:{proposal.id}:{cleaned_purpose}"
+        existing = self._validation_by_review_key(review_key)
+        if existing is not None:
+            return existing
+        now = _timestamp()
+        validation_id = str(uuid4())
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO kdaf_validation_queue
+                        (id, subject_type, subject_id, status, payload_json, reviewer,
+                         comment, created_at, updated_at, decided_at, review_key)
+                    VALUES (?, 'graph_extension_proposal', ?, 'pending', ?, NULL,
+                            '', ?, ?, NULL, ?)
+                    """,
+                    (
+                        validation_id,
+                        proposal.id,
+                        _json(cleaned_payload),
+                        now,
+                        now,
+                        review_key,
+                    ),
+                )
+                self._insert_decision(
+                    connection,
+                    validation_id,
+                    "enqueue",
+                    None,
+                    "pending",
+                    "system",
+                    "",
+                )
+                self._audit(
+                    connection,
+                    "graph_extension_review.enqueued",
+                    "graph_extension_proposal",
+                    proposal.id,
+                    {
+                        "validation_id": validation_id,
+                        "proposal_version": proposal.proposal_version,
+                        "purpose": cleaned_purpose,
+                        "proposal_digest": cleaned_payload.get("proposal_digest"),
+                    },
+                )
+        except sqlite3.IntegrityError:
+            existing = self._validation_by_review_key(review_key)
+            if existing is None:
+                raise
+            return existing
+        return self.get_validation(validation_id)
+
+    def get_graph_extension_review(
+        self,
+        proposal_id: str,
+        purpose: str,
+    ) -> ValidationItem | None:
+        proposal = self.get_graph_extension_proposal(proposal_id)
+        review_key = (
+            f"graph_extension_proposal:{proposal.id}:"
+            f"{_require_text('graph_review.purpose', purpose)}"
+        )
+        return self._validation_by_review_key(review_key)
+
+    def _validation_by_review_key(self, review_key: str) -> ValidationItem | None:
+        row = self._fetch_one(
+            "SELECT id FROM kdaf_validation_queue WHERE review_key = ?",
+            (review_key,),
+        )
+        return None if row is None else self.get_validation(row["id"])
+
+    def reserve_graph_extension_publication(
+        self,
+        *,
+        proposal_id: str,
+        database_name: str,
+        graph_publication_id: str,
+        proposal_digest: str,
+        review_id: str,
+    ) -> GraphExtensionPublicationRecord:
+        proposal = self.get_graph_extension_proposal(proposal_id)
+        review = self.get_validation(review_id)
+        if review.subject_type != "graph_extension_proposal" or review.subject_id != proposal.id:
+            raise MetadataError("Review does not belong to proposal", "invalid_scope")
+        cleaned_database = _require_text("graph_publication.database", database_name)
+        cleaned_graph_id = _require_text(
+            "graph_publication.graph_publication_id", graph_publication_id
+        )
+        cleaned_digest = _require_text("graph_publication.proposal_digest", proposal_digest)
+        now = _timestamp()
+        record_id = str(uuid4())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                """
+                SELECT * FROM kdaf_graph_extension_publications
+                WHERE proposal_id = ? AND proposal_version = ? AND database_name = ?
+                """,
+                (proposal.id, proposal.proposal_version, cleaned_database),
+            ).fetchone()
+            if existing is not None:
+                record = _graph_extension_publication_from_row(existing)
+                if (
+                    record.graph_publication_id != cleaned_graph_id
+                    or record.proposal_digest != cleaned_digest
+                    or record.review_id != review.id
+                ):
+                    raise MetadataError(
+                        "Existing publication reservation does not match this reviewed proposal",
+                        "publication_conflict",
+                    )
+                return record
+            connection.execute(
+                """
+                INSERT INTO kdaf_graph_extension_publications (
+                    id, proposal_id, project_id, proposal_version, database_name,
+                    graph_publication_id, proposal_digest, review_id, status,
+                    attempt_count, summary_json, error_code, error_message,
+                    created_at, updated_at, published_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, '{}', NULL, NULL, ?, ?, NULL)
+                """,
+                (
+                    record_id,
+                    proposal.id,
+                    proposal.project_id,
+                    proposal.proposal_version,
+                    cleaned_database,
+                    cleaned_graph_id,
+                    cleaned_digest,
+                    review.id,
+                    now,
+                    now,
+                ),
+            )
+            self._audit(
+                connection,
+                "graph_extension_publication.reserved",
+                "graph_extension_publication",
+                record_id,
+                {
+                    "proposal_id": proposal.id,
+                    "proposal_version": proposal.proposal_version,
+                    "database": cleaned_database,
+                    "review_id": review.id,
+                },
+            )
+        return self.get_graph_extension_publication(record_id)
+
+    def begin_graph_extension_publication(
+        self,
+        publication_id: str,
+    ) -> GraphExtensionPublicationRecord:
+        record = self.get_graph_extension_publication(publication_id)
+        if record.status == "published":
+            return record
+        now = _timestamp()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE kdaf_graph_extension_publications
+                SET status = 'publishing', attempt_count = attempt_count + 1,
+                    error_code = NULL, error_message = NULL, updated_at = ?
+                WHERE id = ? AND status IN ('pending', 'publishing', 'failed')
+                """,
+                (now, record.id),
+            )
+            if cursor.rowcount != 1:
+                raise MetadataError(
+                    "Publication state changed concurrently",
+                    "concurrent_transition",
+                )
+            self._audit(
+                connection,
+                "graph_extension_publication.started",
+                "graph_extension_publication",
+                record.id,
+                {"attempt": record.attempt_count + 1},
+            )
+        return self.get_graph_extension_publication(record.id)
+
+    def complete_graph_extension_publication(
+        self,
+        publication_id: str,
+        summary: dict[str, Any],
+    ) -> GraphExtensionPublicationRecord:
+        record = self.get_graph_extension_publication(publication_id)
+        if record.status == "published":
+            return record
+        cleaned_summary = _require_object("graph_publication.summary", summary)
+        now = _timestamp()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE kdaf_graph_extension_publications
+                SET status = 'published', summary_json = ?, error_code = NULL,
+                    error_message = NULL, updated_at = ?, published_at = ?
+                WHERE id = ? AND status IN ('publishing', 'failed')
+                """,
+                (_json(cleaned_summary), now, now, record.id),
+            )
+            if cursor.rowcount != 1:
+                raise MetadataError(
+                    "Publication state changed concurrently",
+                    "concurrent_transition",
+                )
+            self._audit(
+                connection,
+                "graph_extension_publication.published",
+                "graph_extension_publication",
+                record.id,
+                cleaned_summary,
+            )
+        return self.get_graph_extension_publication(record.id)
+
+    def fail_graph_extension_publication(
+        self,
+        publication_id: str,
+        *,
+        error_code: str,
+        error_message: str,
+    ) -> GraphExtensionPublicationRecord:
+        record = self.get_graph_extension_publication(publication_id)
+        if record.status == "published":
+            return record
+        cleaned_code = _require_text("graph_publication.error_code", error_code)
+        cleaned_message = _require_text("graph_publication.error_message", error_message)
+        now = _timestamp()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE kdaf_graph_extension_publications
+                SET status = 'failed', error_code = ?, error_message = ?, updated_at = ?
+                WHERE id = ? AND status != 'published'
+                """,
+                (cleaned_code, cleaned_message, now, record.id),
+            )
+            self._audit(
+                connection,
+                "graph_extension_publication.failed",
+                "graph_extension_publication",
+                record.id,
+                {"error_code": cleaned_code},
+            )
+        return self.get_graph_extension_publication(record.id)
+
+    def get_graph_extension_publication(
+        self,
+        publication_id: str,
+    ) -> GraphExtensionPublicationRecord:
+        row = self._fetch_one(
+            "SELECT * FROM kdaf_graph_extension_publications WHERE id = ?",
+            (_require_text("graph_publication.id", publication_id),),
+        )
+        if row is None:
+            raise MetadataError(
+                f"Graph extension publication not found: {publication_id}",
+                "not_found",
+            )
+        return _graph_extension_publication_from_row(row)
+
+    def list_graph_extension_publications(
+        self,
+        *,
+        project_id: str | None = None,
+        proposal_id: str | None = None,
+    ) -> list[GraphExtensionPublicationRecord]:
+        query = "SELECT * FROM kdaf_graph_extension_publications"
+        clauses: list[str] = []
+        params: list[str] = []
+        if project_id is not None:
+            project = self.get_project(project_id)
+            clauses.append("project_id = ?")
+            params.append(project.id)
+        if proposal_id is not None:
+            proposal = self.get_graph_extension_proposal(proposal_id)
+            clauses.append("proposal_id = ?")
+            params.append(proposal.id)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at, id"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [_graph_extension_publication_from_row(row) for row in rows]
 
     def record_audit_event(
         self,
@@ -899,14 +1224,27 @@ class MetadataRepository:
         now = _timestamp()
         decided_at = now if target in TERMINAL_VALIDATION_STATUSES else None
         with self._connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 UPDATE kdaf_validation_queue
                 SET status = ?, reviewer = ?, comment = ?, updated_at = ?, decided_at = ?
-                WHERE id = ?
+                WHERE id = ? AND status = ?
                 """,
-                (target, cleaned_reviewer, cleaned_comment, now, decided_at, item.id),
+                (
+                    target,
+                    cleaned_reviewer,
+                    cleaned_comment,
+                    now,
+                    decided_at,
+                    item.id,
+                    item.status,
+                ),
             )
+            if cursor.rowcount != 1:
+                raise MetadataError(
+                    "Validation state changed concurrently",
+                    "concurrent_transition",
+                )
             self._insert_decision(
                 connection,
                 item.id,
@@ -1259,7 +1597,7 @@ def _schema_sql() -> str:
         id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL,
         status TEXT NOT NULL, payload_json TEXT NOT NULL DEFAULT '{}', reviewer TEXT,
         comment TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-        decided_at TEXT
+        decided_at TEXT, review_key TEXT
     );
     CREATE TABLE IF NOT EXISTS kdaf_validation_decisions (
         id TEXT PRIMARY KEY, validation_id TEXT NOT NULL REFERENCES kdaf_validation_queue(id),
@@ -1317,6 +1655,30 @@ def _schema_sql() -> str:
         ON kdaf_graph_extension_proposals(project_id);
     CREATE INDEX IF NOT EXISTS idx_kdaf_graph_proposals_handoff
         ON kdaf_graph_extension_proposals(handoff_id);
+    CREATE TABLE IF NOT EXISTS kdaf_graph_extension_publications (
+        id TEXT PRIMARY KEY,
+        proposal_id TEXT NOT NULL REFERENCES kdaf_graph_extension_proposals(id),
+        project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
+        proposal_version INTEGER NOT NULL,
+        database_name TEXT NOT NULL,
+        graph_publication_id TEXT NOT NULL,
+        proposal_digest TEXT NOT NULL,
+        review_id TEXT NOT NULL REFERENCES kdaf_validation_queue(id),
+        status TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        summary_json TEXT NOT NULL DEFAULT '{}',
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE (proposal_id, proposal_version, database_name),
+        UNIQUE (graph_publication_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_kdaf_graph_publications_project
+        ON kdaf_graph_extension_publications(project_id);
+    CREATE INDEX IF NOT EXISTS idx_kdaf_graph_publications_proposal
+        ON kdaf_graph_extension_publications(proposal_id);
     """
 
 
@@ -1337,6 +1699,7 @@ def _validation_migration_columns() -> dict[str, str]:
         "comment": "TEXT NOT NULL DEFAULT ''",
         "updated_at": "TEXT NOT NULL DEFAULT ''",
         "decided_at": "TEXT",
+        "review_key": "TEXT",
     }
 
 
@@ -1387,6 +1750,29 @@ def _graph_extension_proposal_from_row(
         payload=json.loads(row["payload_json"]),
         coverage=json.loads(row["coverage_json"]),
         created_at=row["created_at"],
+    )
+
+
+def _graph_extension_publication_from_row(
+    row: sqlite3.Row,
+) -> GraphExtensionPublicationRecord:
+    return GraphExtensionPublicationRecord(
+        id=row["id"],
+        proposal_id=row["proposal_id"],
+        project_id=row["project_id"],
+        proposal_version=int(row["proposal_version"]),
+        database_name=row["database_name"],
+        graph_publication_id=row["graph_publication_id"],
+        proposal_digest=row["proposal_digest"],
+        review_id=row["review_id"],
+        status=row["status"],
+        attempt_count=int(row["attempt_count"]),
+        summary=json.loads(row["summary_json"]),
+        error_code=row["error_code"],
+        error_message=row["error_message"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        published_at=row["published_at"],
     )
 
 

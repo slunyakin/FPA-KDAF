@@ -37,6 +37,16 @@ workflow.
 
 ## Initialize and inspect
 
+Live planning, initialization, and inspection require the Neo4j client extra:
+
+```bash
+python -m pip install "kdaf[neo4j]"
+```
+
+If it is absent, KDAF returns the stable `neo4j_driver_missing` error. Connection,
+authentication, and explicit database-target failures use separate bounded error
+codes so operators can distinguish installation from deployment configuration.
+
 ```bash
 kdaf --config config/kdaf.example.toml \
   finance-foundation initialize --database neo4j

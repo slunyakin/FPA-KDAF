@@ -34,6 +34,13 @@ TOOL_NAMES = (
     "graph_proposal.list",
     "graph_proposal.get",
     "graph_proposal.coverage",
+    "graph_proposal.review",
+    "graph_proposal.review_get",
+    "graph_publication.plan",
+    "graph_publication.publish",
+    "graph_publication.list",
+    "graph_publication.get",
+    "graph_publication.question_scope",
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
@@ -231,6 +238,45 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             "status": proposal["status"],
             "coverage": proposal["coverage"],
         }
+    if tool_name == "graph_proposal.review":
+        return core.review_graph_extension_proposal(
+            _required_arg(args, "id"),
+            decision=_required_arg(args, "decision"),
+            reviewer=_required_arg(args, "reviewer"),
+            reason=_required_arg(args, "reason"),
+            purpose=_optional_string_arg(args, "purpose") or "semantic_publication",
+        )
+    if tool_name == "graph_proposal.review_get":
+        return core.get_graph_extension_review(
+            _required_arg(args, "id"),
+            purpose=_optional_string_arg(args, "purpose") or "semantic_publication",
+        )
+    if tool_name == "graph_publication.plan":
+        return core.plan_graph_extension_publication(
+            _required_arg(args, "proposal_id"),
+            _required_arg(args, "database"),
+            purpose=_optional_string_arg(args, "purpose") or "semantic_publication",
+        )
+    if tool_name == "graph_publication.publish":
+        return core.publish_graph_extension_proposal(
+            _required_arg(args, "proposal_id"),
+            _required_arg(args, "database"),
+            purpose=_optional_string_arg(args, "purpose") or "semantic_publication",
+        )
+    if tool_name == "graph_publication.list":
+        return core.list_graph_extension_publications(
+            project_id=_optional_string_arg(args, "project_id"),
+            proposal_id=_optional_string_arg(args, "proposal_id"),
+        )
+    if tool_name == "graph_publication.get":
+        return core.get_graph_extension_publication(_required_arg(args, "id"))
+    if tool_name == "graph_publication.question_scope":
+        return core.get_published_question_scope(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "database"),
+            question_id=_optional_string_arg(args, "question_id"),
+            graph_publication_id=_optional_string_arg(args, "publication_id"),
+        )
     if tool_name == "starter_dwh.schema":
         return core.starter_dwh_schema()
     if tool_name == "starter_dwh.load":
