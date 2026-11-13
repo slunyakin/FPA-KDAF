@@ -81,6 +81,11 @@ Question-scope results contain the approved concepts and relationships required
 by that competency question. Data-reference requirements remain semantic
 requirements; this workflow does not load financial values into Neo4j.
 
+An approved scope can be made executable through a stable, versioned
+[question binding](question-bindings.md). Semantic-only bindings use this graph
+scope without forcing a DWH query; quantitative bindings attach an explicitly
+registered read-only data operation.
+
 ## Current slice and limits
 
 This slice publishes reviewed graph-extension proposals from the question-mapping

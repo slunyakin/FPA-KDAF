@@ -6,7 +6,8 @@ import hashlib
 import re
 import sqlite3
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Protocol
@@ -51,6 +52,7 @@ class DwhQueryResult:
     executed_at: str
     store: str = "financial_dwh"
     mode: str = "read_only"
+    operation_version: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -159,10 +161,52 @@ class ReadOnlyDwhQueryService:
                 " ".join(definition.sql.split()).encode("utf-8")
             ).hexdigest(),
             parameters=params,
-            rows=[dict(row) for row in rows],
+            rows=_normalize_rows(rows),
             row_count=len(rows),
             duration_ms=elapsed,
             executed_at=_timestamp(),
+        )
+
+    def execute_registered(
+        self,
+        *,
+        operation_id: str,
+        operation_version: int,
+        statement: str,
+        parameters: dict[str, Any],
+        max_rows: int,
+    ) -> DwhQueryResult:
+        _assert_read_only(statement)
+        started = perf_counter()
+        try:
+            with self._connect() as connection:
+                cursor = connection.execute(statement, parameters)
+                rows = cursor.fetchmany(max_rows + 1)
+        except sqlite3.ProgrammingError as exc:
+            raise RetrievalError(
+                "Registered data operation parameters do not match its statement",
+                "invalid_parameter",
+            ) from exc
+        except sqlite3.OperationalError as exc:
+            raise RetrievalError("Financial DWH is not loaded", "dwh_not_loaded") from exc
+        if len(rows) > max_rows:
+            raise RetrievalError(
+                "Registered data operation exceeded its result limit",
+                "result_too_large",
+            )
+        elapsed = round((perf_counter() - started) * 1000, 3)
+        return DwhQueryResult(
+            id=f"dwh-operation:{uuid4()}",
+            query_id=operation_id,
+            statement_fingerprint=hashlib.sha256(
+                " ".join(statement.split()).encode("utf-8")
+            ).hexdigest(),
+            parameters=parameters,
+            rows=_normalize_rows(rows),
+            row_count=len(rows),
+            duration_ms=elapsed,
+            executed_at=_timestamp(),
+            operation_version=operation_version,
         )
 
     def _connect(self) -> sqlite3.Connection:
@@ -195,7 +239,11 @@ class PostgresDwhQueryService:
     def execute(self, query_id: str, parameters: dict[str, Any] | None = None) -> DwhQueryResult:
         definition, params = _prepare_query(query_id, parameters)
         _assert_read_only(definition.sql)
-        postgres_sql = re.sub(r":([a-zA-Z_][a-zA-Z0-9_]*)", r"%(\1)s", definition.sql)
+        postgres_sql = re.sub(
+            r"(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)",
+            r"%(\1)s",
+            definition.sql,
+        )
         try:
             import psycopg
         except ImportError as exc:
@@ -226,10 +274,67 @@ class PostgresDwhQueryService:
                 " ".join(definition.sql.split()).encode("utf-8")
             ).hexdigest(),
             parameters=params,
-            rows=[dict(row) for row in rows],
+            rows=_normalize_rows(rows),
             row_count=len(rows),
             duration_ms=elapsed,
             executed_at=_timestamp(),
+        )
+
+    def execute_registered(
+        self,
+        *,
+        operation_id: str,
+        operation_version: int,
+        statement: str,
+        parameters: dict[str, Any],
+        max_rows: int,
+    ) -> DwhQueryResult:
+        _assert_read_only(statement)
+        postgres_sql = re.sub(
+            r"(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)",
+            r"%(\1)s",
+            statement,
+        )
+        try:
+            import psycopg
+        except ImportError as exc:
+            raise RetrievalError(
+                "Postgres driver is not installed. Install 'kdaf[postgres]' and retry.",
+                "dwh_unavailable",
+            ) from exc
+        started = perf_counter()
+        try:
+            with (
+                psycopg.connect(
+                    **self.connection_settings,
+                    row_factory=psycopg.rows.dict_row,
+                    options="-c default_transaction_read_only=on",
+                ) as connection,
+                connection.cursor() as cursor,
+            ):
+                cursor.execute("SET TRANSACTION READ ONLY")
+                cursor.execute(postgres_sql, parameters)
+                rows = cursor.fetchmany(max_rows + 1)
+        except Exception as exc:
+            raise RetrievalError("Financial DWH is unavailable", "dwh_unavailable") from exc
+        if len(rows) > max_rows:
+            raise RetrievalError(
+                "Registered data operation exceeded its result limit",
+                "result_too_large",
+            )
+        elapsed = round((perf_counter() - started) * 1000, 3)
+        return DwhQueryResult(
+            id=f"dwh-operation:{uuid4()}",
+            query_id=operation_id,
+            statement_fingerprint=hashlib.sha256(
+                " ".join(statement.split()).encode("utf-8")
+            ).hexdigest(),
+            parameters=parameters,
+            rows=_normalize_rows(rows),
+            row_count=len(rows),
+            duration_ms=elapsed,
+            executed_at=_timestamp(),
+            operation_version=operation_version,
         )
 
 
@@ -240,6 +345,21 @@ def _assert_read_only(sql: str) -> None:
     without_trailing = normalized.rstrip("; ")
     if ";" in without_trailing or _WRITE_SQL.search(without_trailing):
         raise RetrievalError("DWH service accepts read-only queries only", "unsafe_query")
+
+
+def _normalize_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    return [
+        {str(key): _normalize_value(value) for key, value in dict(row).items()}
+        for row in rows
+    ]
+
+
+def _normalize_value(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, date | datetime):
+        return value.isoformat()
+    return value
 
 
 def _prepare_query(

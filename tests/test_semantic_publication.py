@@ -481,6 +481,22 @@ def test_reviewed_extension_publishes_atomically_to_real_neo4j(tmp_path) -> None
             "neo4j",
             question_id=question_id,
         )
+        run = core.create_run(project_id)
+        binding = core.register_question_binding(
+            project_id,
+            "live-renewal-scope",
+            question_id,
+            evidence_mode="semantic_only",
+            required_concept_ids=["account:revenue", proposed["id"]],
+            graph_publication_id=first["graph_publication_id"],
+        )
+        core.activate_question_binding(binding["id"], "neo4j")
+        packet = core.execute_question_binding(
+            project_id,
+            "live-renewal-scope",
+            run["id"],
+            "neo4j",
+        )
 
         assert plan["action"] == "publish"
         assert first["status"] == "published"
@@ -491,6 +507,12 @@ def test_reviewed_extension_publishes_atomically_to_real_neo4j(tmp_path) -> None
             proposed["id"],
         }
         assert scope["scopes"][0]["relationships"][0]["id"] == (proposed["relationships"][0]["id"])
+        assert packet["binding"]["version"] == 1
+        assert packet["dwh_queries"] == []
+        assert {item["id"] for item in packet["graph_nodes"]} == {
+            "account:revenue",
+            proposed["id"],
+        }
     finally:
         if project_id is not None:
             settings = core._neo4j_connection_settings()

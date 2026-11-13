@@ -21,6 +21,7 @@ from kdaf.graph import GraphProvenanceRepository
 from kdaf.metadata import (
     AuditEvent,
     CompetencyQuestion,
+    DataOperationRecord,
     DiscoveryHandoffRecord,
     ExtractionBatch,
     GraphExtensionProposalRecord,
@@ -31,11 +32,13 @@ from kdaf.metadata import (
     PackageMetadata,
     Project,
     ProvenanceLink,
+    QuestionBindingRecord,
     Run,
     Source,
     ValidationItem,
     package_metadata,
 )
+from kdaf.question_execution import QuestionBindingService, QuestionExecutionError
 from kdaf.question_mapping import (
     DeterministicQuestionMappingProposer,
     Neo4jMappingContextProvider,
@@ -87,6 +90,7 @@ __all__ = [
     "ConfigError",
     "CompetencyQuestion",
     "CsvExtractor",
+    "DataOperationRecord",
     "DatabaseConfig",
     "DeterministicQuestionMappingProposer",
     "DiscoveryHandoffRecord",
@@ -121,6 +125,9 @@ __all__ = [
     "ProviderBackedQuestionMappingProposer",
     "QuestionMappingError",
     "QuestionMappingService",
+    "QuestionBindingRecord",
+    "QuestionBindingService",
+    "QuestionExecutionError",
     "ReadOnlyDwhQueryService",
     "RecordedQuestionMappingProposer",
     "RetrievalError",

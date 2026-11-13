@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from kdaf._version import __version__
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
 TERMINAL_VALIDATION_STATUSES = frozenset({"approved", "rejected"})
 
@@ -256,6 +256,47 @@ class GraphExtensionPublicationRecord:
     created_at: str
     updated_at: str
     published_at: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DataOperationRecord:
+    id: str
+    project_id: str
+    operation_id: str
+    version: int
+    status: str
+    statement: str
+    parameter_schema: dict[str, Any]
+    result_schema: dict[str, Any]
+    evidence_eligible: bool
+    max_rows: int
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class QuestionBindingRecord:
+    id: str
+    project_id: str
+    binding_id: str
+    version: int
+    question_id: str
+    status: str
+    evidence_mode: str
+    required_concept_ids: list[str]
+    graph_publication_id: str
+    data_operation_id: str | None
+    data_operation_version: int | None
+    parameter_schema: dict[str, Any]
+    result_schema: dict[str, Any]
+    created_at: str
+    activated_at: str | None
+    superseded_at: str | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -871,6 +912,335 @@ class MetadataRepository:
         with self._connect() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [_graph_extension_publication_from_row(row) for row in rows]
+
+    def create_data_operation(
+        self,
+        project_id: str,
+        operation_id: str,
+        *,
+        statement: str,
+        parameter_schema: dict[str, Any],
+        result_schema: dict[str, Any],
+        evidence_eligible: bool,
+        max_rows: int,
+    ) -> DataOperationRecord:
+        project = self.get_project(project_id)
+        cleaned_operation_id = _require_text("data_operation.operation_id", operation_id)
+        cleaned_statement = _require_text("data_operation.statement", statement)
+        cleaned_parameters = _require_object("data_operation.parameter_schema", parameter_schema)
+        cleaned_result = _require_object("data_operation.result_schema", result_schema)
+        if not isinstance(evidence_eligible, bool):
+            raise MetadataError(
+                "data_operation.evidence_eligible must be a boolean",
+                "invalid_input",
+            )
+        if not isinstance(max_rows, int) or isinstance(max_rows, bool) or not 1 <= max_rows <= 1000:
+            raise MetadataError(
+                "data_operation.max_rows must be between 1 and 1000",
+                "invalid_input",
+            )
+        record_id = str(uuid4())
+        created_at = _timestamp()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT coalesce(max(version), 0) + 1 AS next_version
+                FROM kdaf_data_operations
+                WHERE project_id = ? AND operation_id = ?
+                """,
+                (project.id, cleaned_operation_id),
+            ).fetchone()
+            version = int(row["next_version"])
+            connection.execute(
+                """
+                INSERT INTO kdaf_data_operations (
+                    id, project_id, operation_id, version, status, statement,
+                    parameter_schema_json, result_schema_json, evidence_eligible,
+                    max_rows, created_at
+                ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record_id,
+                    project.id,
+                    cleaned_operation_id,
+                    version,
+                    cleaned_statement,
+                    _json(cleaned_parameters),
+                    _json(cleaned_result),
+                    int(evidence_eligible),
+                    max_rows,
+                    created_at,
+                ),
+            )
+            self._audit(
+                connection,
+                "data_operation.registered",
+                "data_operation",
+                record_id,
+                {
+                    "project_id": project.id,
+                    "operation_id": cleaned_operation_id,
+                    "version": version,
+                    "evidence_eligible": evidence_eligible,
+                    "max_rows": max_rows,
+                },
+            )
+        return self.get_data_operation(project.id, cleaned_operation_id, version=version)
+
+    def get_data_operation(
+        self,
+        project_id: str,
+        operation_id: str,
+        *,
+        version: int | None = None,
+    ) -> DataOperationRecord:
+        project = self.get_project(project_id)
+        cleaned_operation_id = _require_text("data_operation.operation_id", operation_id)
+        query = """
+            SELECT * FROM kdaf_data_operations
+            WHERE project_id = ? AND operation_id = ?
+        """
+        params: list[Any] = [project.id, cleaned_operation_id]
+        if version is not None:
+            if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+                raise MetadataError("Invalid data operation version", "invalid_input")
+            query += " AND version = ?"
+            params.append(version)
+        query += " ORDER BY version DESC LIMIT 1"
+        row = self._fetch_one(query, tuple(params))
+        if row is None:
+            raise MetadataError(
+                f"Data operation not found: {cleaned_operation_id}",
+                "not_found",
+            )
+        return _data_operation_from_row(row)
+
+    def list_data_operations(
+        self,
+        project_id: str,
+    ) -> list[DataOperationRecord]:
+        project = self.get_project(project_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM kdaf_data_operations
+                WHERE project_id = ? ORDER BY operation_id, version
+                """,
+                (project.id,),
+            ).fetchall()
+        return [_data_operation_from_row(row) for row in rows]
+
+    def create_question_binding(
+        self,
+        project_id: str,
+        binding_id: str,
+        question_id: str,
+        *,
+        evidence_mode: str,
+        required_concept_ids: list[str],
+        graph_publication_id: str,
+        data_operation: DataOperationRecord | None,
+    ) -> QuestionBindingRecord:
+        project = self.get_project(project_id)
+        question = self.get_competency_question(question_id)
+        if question.project_id != project.id:
+            raise MetadataError(
+                "Question binding and competency question must share a project",
+                "invalid_scope",
+            )
+        cleaned_binding_id = _require_text("question_binding.binding_id", binding_id)
+        cleaned_mode = _require_text("question_binding.evidence_mode", evidence_mode)
+        if cleaned_mode not in {"semantic_only", "quantitative"}:
+            raise MetadataError("Invalid question binding evidence mode", "invalid_input")
+        if not isinstance(required_concept_ids, list) or not required_concept_ids:
+            raise MetadataError(
+                "Question binding requires concept IDs",
+                "missing_field",
+            )
+        cleaned_concepts = sorted(
+            {
+                _require_text("question_binding.required_concept_ids", item)
+                for item in required_concept_ids
+            }
+        )
+        if len(cleaned_concepts) != len(required_concept_ids):
+            raise MetadataError(
+                "Question binding concept IDs must not contain duplicates",
+                "duplicate_id",
+            )
+        cleaned_publication_id = _require_text(
+            "question_binding.graph_publication_id", graph_publication_id
+        )
+        if cleaned_mode == "quantitative" and data_operation is None:
+            raise MetadataError(
+                "Quantitative binding requires a data operation",
+                "missing_data_binding",
+            )
+        if cleaned_mode == "semantic_only" and data_operation is not None:
+            raise MetadataError(
+                "Semantic-only binding cannot reference a data operation",
+                "invalid_data_binding",
+            )
+        if data_operation is not None and data_operation.project_id != project.id:
+            raise MetadataError(
+                "Question binding and data operation must share a project",
+                "invalid_scope",
+            )
+        record_id = str(uuid4())
+        created_at = _timestamp()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT coalesce(max(version), 0) + 1 AS next_version
+                FROM kdaf_question_bindings
+                WHERE project_id = ? AND binding_id = ?
+                """,
+                (project.id, cleaned_binding_id),
+            ).fetchone()
+            version = int(row["next_version"])
+            connection.execute(
+                """
+                INSERT INTO kdaf_question_bindings (
+                    id, project_id, binding_id, version, question_id, status,
+                    evidence_mode, required_concept_ids_json, graph_publication_id,
+                    data_operation_id, data_operation_version, parameter_schema_json,
+                    result_schema_json, created_at, activated_at, superseded_at
+                ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+                """,
+                (
+                    record_id,
+                    project.id,
+                    cleaned_binding_id,
+                    version,
+                    question.id,
+                    cleaned_mode,
+                    _json(cleaned_concepts),
+                    cleaned_publication_id,
+                    None if data_operation is None else data_operation.operation_id,
+                    None if data_operation is None else data_operation.version,
+                    _json({} if data_operation is None else data_operation.parameter_schema),
+                    _json({} if data_operation is None else data_operation.result_schema),
+                    created_at,
+                ),
+            )
+            self._audit(
+                connection,
+                "question_binding.registered",
+                "question_binding",
+                record_id,
+                {
+                    "project_id": project.id,
+                    "binding_id": cleaned_binding_id,
+                    "version": version,
+                    "question_id": question.id,
+                    "evidence_mode": cleaned_mode,
+                    "graph_publication_id": cleaned_publication_id,
+                },
+            )
+        return self.get_question_binding_record(record_id)
+
+    def activate_question_binding(self, record_id: str) -> QuestionBindingRecord:
+        record = self.get_question_binding_record(record_id)
+        if record.status == "active":
+            return record
+        if record.status != "draft":
+            raise MetadataError(
+                f"Question binding in {record.status} state cannot be activated",
+                "invalid_transition",
+            )
+        now = _timestamp()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """
+                UPDATE kdaf_question_bindings
+                SET status = 'superseded', superseded_at = ?
+                WHERE project_id = ? AND binding_id = ? AND status = 'active'
+                """,
+                (now, record.project_id, record.binding_id),
+            )
+            cursor = connection.execute(
+                """
+                UPDATE kdaf_question_bindings
+                SET status = 'active', activated_at = ?
+                WHERE id = ? AND status = 'draft'
+                """,
+                (now, record.id),
+            )
+            if cursor.rowcount != 1:
+                raise MetadataError(
+                    "Question binding state changed concurrently",
+                    "concurrent_transition",
+                )
+            self._audit(
+                connection,
+                "question_binding.activated",
+                "question_binding",
+                record.id,
+                {
+                    "binding_id": record.binding_id,
+                    "version": record.version,
+                    "question_id": record.question_id,
+                },
+            )
+        return self.get_question_binding_record(record.id)
+
+    def get_question_binding_record(self, record_id: str) -> QuestionBindingRecord:
+        row = self._fetch_one(
+            "SELECT * FROM kdaf_question_bindings WHERE id = ?",
+            (_require_text("question_binding.id", record_id),),
+        )
+        if row is None:
+            raise MetadataError(f"Question binding not found: {record_id}", "binding_not_found")
+        return _question_binding_from_row(row)
+
+    def get_question_binding(
+        self,
+        project_id: str,
+        binding_id: str,
+        *,
+        version: int | None = None,
+        active_only: bool = False,
+    ) -> QuestionBindingRecord:
+        project = self.get_project(project_id)
+        cleaned_binding_id = _require_text("question_binding.binding_id", binding_id)
+        query = """
+            SELECT * FROM kdaf_question_bindings
+            WHERE project_id = ? AND binding_id = ?
+        """
+        params: list[Any] = [project.id, cleaned_binding_id]
+        if version is not None:
+            if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+                raise MetadataError("Invalid question binding version", "invalid_input")
+            query += " AND version = ?"
+            params.append(version)
+        if active_only:
+            query += " AND status = 'active'"
+        query += " ORDER BY version DESC LIMIT 1"
+        row = self._fetch_one(query, tuple(params))
+        if row is None:
+            raise MetadataError(
+                f"Question binding not found: {cleaned_binding_id}",
+                "binding_not_found",
+            )
+        return _question_binding_from_row(row)
+
+    def list_question_bindings(
+        self,
+        project_id: str,
+    ) -> list[QuestionBindingRecord]:
+        project = self.get_project(project_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM kdaf_question_bindings
+                WHERE project_id = ? ORDER BY binding_id, version
+                """,
+                (project.id,),
+            ).fetchall()
+        return [_question_binding_from_row(row) for row in rows]
 
     def record_audit_event(
         self,
@@ -1679,6 +2049,45 @@ def _schema_sql() -> str:
         ON kdaf_graph_extension_publications(project_id);
     CREATE INDEX IF NOT EXISTS idx_kdaf_graph_publications_proposal
         ON kdaf_graph_extension_publications(proposal_id);
+    CREATE TABLE IF NOT EXISTS kdaf_data_operations (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
+        operation_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        statement TEXT NOT NULL,
+        parameter_schema_json TEXT NOT NULL,
+        result_schema_json TEXT NOT NULL,
+        evidence_eligible INTEGER NOT NULL,
+        max_rows INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (project_id, operation_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_kdaf_data_operations_project
+        ON kdaf_data_operations(project_id, operation_id);
+    CREATE TABLE IF NOT EXISTS kdaf_question_bindings (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
+        binding_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        question_id TEXT NOT NULL REFERENCES kdaf_competency_questions(id),
+        status TEXT NOT NULL,
+        evidence_mode TEXT NOT NULL,
+        required_concept_ids_json TEXT NOT NULL,
+        graph_publication_id TEXT NOT NULL,
+        data_operation_id TEXT,
+        data_operation_version INTEGER,
+        parameter_schema_json TEXT NOT NULL,
+        result_schema_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        activated_at TEXT,
+        superseded_at TEXT,
+        UNIQUE (project_id, binding_id, version)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_kdaf_active_question_binding
+        ON kdaf_question_bindings(project_id, binding_id) WHERE status = 'active';
+    CREATE INDEX IF NOT EXISTS idx_kdaf_question_bindings_question
+        ON kdaf_question_bindings(question_id);
     """
 
 
@@ -1773,6 +2182,45 @@ def _graph_extension_publication_from_row(
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         published_at=row["published_at"],
+    )
+
+
+def _data_operation_from_row(row: sqlite3.Row) -> DataOperationRecord:
+    return DataOperationRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        operation_id=row["operation_id"],
+        version=int(row["version"]),
+        status=row["status"],
+        statement=row["statement"],
+        parameter_schema=json.loads(row["parameter_schema_json"]),
+        result_schema=json.loads(row["result_schema_json"]),
+        evidence_eligible=bool(row["evidence_eligible"]),
+        max_rows=int(row["max_rows"]),
+        created_at=row["created_at"],
+    )
+
+
+def _question_binding_from_row(row: sqlite3.Row) -> QuestionBindingRecord:
+    return QuestionBindingRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        binding_id=row["binding_id"],
+        version=int(row["version"]),
+        question_id=row["question_id"],
+        status=row["status"],
+        evidence_mode=row["evidence_mode"],
+        required_concept_ids=json.loads(row["required_concept_ids_json"]),
+        graph_publication_id=row["graph_publication_id"],
+        data_operation_id=row["data_operation_id"],
+        data_operation_version=(
+            None if row["data_operation_version"] is None else int(row["data_operation_version"])
+        ),
+        parameter_schema=json.loads(row["parameter_schema_json"]),
+        result_schema=json.loads(row["result_schema_json"]),
+        created_at=row["created_at"],
+        activated_at=row["activated_at"],
+        superseded_at=row["superseded_at"],
     )
 
 

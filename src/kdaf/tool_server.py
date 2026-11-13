@@ -41,6 +41,14 @@ TOOL_NAMES = (
     "graph_publication.list",
     "graph_publication.get",
     "graph_publication.question_scope",
+    "data_operation.register",
+    "data_operation.list",
+    "data_operation.get",
+    "question_binding.register",
+    "question_binding.activate",
+    "question_binding.get",
+    "question_binding.list",
+    "question_binding.execute",
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
@@ -277,6 +285,58 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             question_id=_optional_string_arg(args, "question_id"),
             graph_publication_id=_optional_string_arg(args, "publication_id"),
         )
+    if tool_name == "data_operation.register":
+        return core.register_data_operation(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "operation_id"),
+            statement=_required_arg(args, "statement"),
+            parameter_schema=_required_object_arg(args, "parameter_schema"),
+            result_schema=_required_object_arg(args, "result_schema"),
+            evidence_eligible=_optional_bool_arg(args, "evidence_eligible", default=True),
+            max_rows=_optional_int_arg(args, "max_rows", default=100),
+        )
+    if tool_name == "data_operation.list":
+        return core.list_data_operations(_required_arg(args, "project_id"))
+    if tool_name == "data_operation.get":
+        return core.get_data_operation(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "operation_id"),
+            version=_optional_int_arg(args, "version", default=None),
+        )
+    if tool_name == "question_binding.register":
+        return core.register_question_binding(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "binding_id"),
+            _required_arg(args, "question_id"),
+            evidence_mode=_required_arg(args, "evidence_mode"),
+            required_concept_ids=_required_string_list_arg(args, "required_concept_ids"),
+            graph_publication_id=_required_arg(args, "graph_publication_id"),
+            data_operation_id=_optional_string_arg(args, "data_operation_id"),
+            data_operation_version=_optional_int_arg(args, "data_operation_version", default=None),
+        )
+    if tool_name == "question_binding.activate":
+        return core.activate_question_binding(
+            _required_arg(args, "id"),
+            _required_arg(args, "database"),
+        )
+    if tool_name == "question_binding.get":
+        return core.get_question_binding(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "binding_id"),
+            version=_optional_int_arg(args, "version", default=None),
+        )
+    if tool_name == "question_binding.list":
+        return core.list_question_bindings(_required_arg(args, "project_id"))
+    if tool_name == "question_binding.execute":
+        return core.execute_question_binding(
+            _required_arg(args, "project_id"),
+            _required_arg(args, "binding_id"),
+            _required_arg(args, "run_id"),
+            _required_arg(args, "database"),
+            version=_optional_int_arg(args, "version", default=None),
+            parameters=_optional_object_arg(args, "parameters"),
+            dwh_store_path=_optional_string_arg(args, "dwh_store_path"),
+        )
     if tool_name == "starter_dwh.schema":
         return core.starter_dwh_schema()
     if tool_name == "starter_dwh.load":
@@ -471,10 +531,33 @@ def _optional_string_list_arg(arguments: dict[str, Any], name: str) -> list[str]
     return value
 
 
+def _required_string_list_arg(arguments: dict[str, Any], name: str) -> list[str]:
+    if name not in arguments:
+        raise KdafError(f"Missing required argument: {name}", code="missing_argument")
+    value = _optional_string_list_arg(arguments, name)
+    if not value:
+        raise KdafError(f"Argument must not be empty: {name}", code="invalid_argument")
+    return value
+
+
 def _optional_bool_arg(arguments: dict[str, Any], name: str, default: bool) -> bool:
     value = arguments.get(name, default)
     if not isinstance(value, bool):
         raise KdafError(f"Argument must be a boolean: {name}", code="invalid_argument")
+    return value
+
+
+def _optional_int_arg(
+    arguments: dict[str, Any],
+    name: str,
+    *,
+    default: int | None,
+) -> int | None:
+    value = arguments.get(name, default)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise KdafError(f"Argument must be an integer: {name}", code="invalid_argument")
     return value
 
 

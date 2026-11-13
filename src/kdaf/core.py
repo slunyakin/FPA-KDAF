@@ -23,6 +23,7 @@ from kdaf.evaluation import grade_evaluation_case
 from kdaf.extraction import CsvExtractor, ExtractionDwhRepository, ExtractionError
 from kdaf.graph import GraphError, GraphProvenanceRepository
 from kdaf.metadata import MetadataError, MetadataRepository, package_metadata
+from kdaf.question_execution import QuestionBindingService, QuestionExecutionError
 from kdaf.question_mapping import (
     DeterministicQuestionMappingProposer,
     MappingContextProvider,
@@ -428,6 +429,143 @@ class KdafCore:
 
     def _semantic_publication_service(self) -> SemanticPublicationService:
         return SemanticPublicationService(
+            self.metadata,
+            Neo4jGraphExtensionPublisher(self._neo4j_connection_settings()),
+        )
+
+    def register_data_operation(
+        self,
+        project_id: str,
+        operation_id: str,
+        *,
+        statement: str,
+        parameter_schema: dict[str, Any],
+        result_schema: dict[str, Any],
+        evidence_eligible: bool = True,
+        max_rows: int = 100,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().register_data_operation(
+                project_id,
+                operation_id,
+                statement=statement,
+                parameter_schema=parameter_schema,
+                result_schema=result_schema,
+                evidence_eligible=evidence_eligible,
+                max_rows=max_rows,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def list_data_operations(self, project_id: str) -> list[dict[str, Any]]:
+        try:
+            return self._question_binding_service().list_data_operations(project_id)
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_data_operation(
+        self,
+        project_id: str,
+        operation_id: str,
+        *,
+        version: int | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().get_data_operation(
+                project_id,
+                operation_id,
+                version=version,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def register_question_binding(
+        self,
+        project_id: str,
+        binding_id: str,
+        question_id: str,
+        *,
+        evidence_mode: str,
+        required_concept_ids: list[str],
+        graph_publication_id: str,
+        data_operation_id: str | None = None,
+        data_operation_version: int | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().register_binding(
+                project_id,
+                binding_id,
+                question_id,
+                evidence_mode=evidence_mode,
+                required_concept_ids=required_concept_ids,
+                graph_publication_id=graph_publication_id,
+                data_operation_id=data_operation_id,
+                data_operation_version=data_operation_version,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def activate_question_binding(
+        self,
+        record_id: str,
+        expected_database: str,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().activate_binding(
+                record_id,
+                expected_database=expected_database,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def get_question_binding(
+        self,
+        project_id: str,
+        binding_id: str,
+        *,
+        version: int | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().get_binding(
+                project_id,
+                binding_id,
+                version=version,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def list_question_bindings(self, project_id: str) -> list[dict[str, Any]]:
+        try:
+            return self._question_binding_service().list_bindings(project_id)
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def execute_question_binding(
+        self,
+        project_id: str,
+        binding_id: str,
+        run_id: str,
+        expected_database: str,
+        *,
+        version: int | None = None,
+        parameters: dict[str, Any] | None = None,
+        dwh_store_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return self._question_binding_service().execute_binding(
+                project_id,
+                binding_id,
+                run_id,
+                expected_database=expected_database,
+                data_service=self._dwh_query_service(dwh_store_path),
+                version=version,
+                parameters=parameters,
+            )
+        except QuestionExecutionError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def _question_binding_service(self) -> QuestionBindingService:
+        return QuestionBindingService(
             self.metadata,
             Neo4jGraphExtensionPublisher(self._neo4j_connection_settings()),
         )

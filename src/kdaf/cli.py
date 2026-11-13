@@ -176,6 +176,72 @@ def build_parser() -> argparse.ArgumentParser:
     graph_publication_scope.add_argument("--question-id")
     graph_publication_scope.add_argument("--publication-id")
 
+    data_operation = subparsers.add_parser(
+        "data-operation",
+        help="Register versioned read-only data operations",
+    )
+    data_operation_subparsers = data_operation.add_subparsers(
+        dest="data_operation_command",
+        required=True,
+    )
+    data_operation_register = data_operation_subparsers.add_parser("register")
+    data_operation_register.add_argument("project_id")
+    data_operation_register.add_argument("operation_id")
+    data_operation_register.add_argument("--statement-file", type=Path, required=True)
+    data_operation_register.add_argument("--parameter-schema-file", type=Path, required=True)
+    data_operation_register.add_argument("--result-schema-file", type=Path, required=True)
+    data_operation_register.add_argument("--not-evidence-eligible", action="store_true")
+    data_operation_register.add_argument("--max-rows", type=int, default=100)
+    data_operation_list = data_operation_subparsers.add_parser("list")
+    data_operation_list.add_argument("project_id")
+    data_operation_get = data_operation_subparsers.add_parser("get")
+    data_operation_get.add_argument("project_id")
+    data_operation_get.add_argument("operation_id")
+    data_operation_get.add_argument("--version", type=int)
+
+    question_binding = subparsers.add_parser(
+        "question-binding",
+        help="Register and execute versioned competency-question bindings",
+    )
+    question_binding_subparsers = question_binding.add_subparsers(
+        dest="question_binding_command",
+        required=True,
+    )
+    question_binding_register = question_binding_subparsers.add_parser("register")
+    question_binding_register.add_argument("project_id")
+    question_binding_register.add_argument("binding_id")
+    question_binding_register.add_argument("question_id")
+    question_binding_register.add_argument(
+        "--evidence-mode",
+        choices=("semantic_only", "quantitative"),
+        required=True,
+    )
+    question_binding_register.add_argument(
+        "--concept-id",
+        action="append",
+        dest="concept_ids",
+        required=True,
+    )
+    question_binding_register.add_argument("--publication-id", required=True)
+    question_binding_register.add_argument("--operation-id")
+    question_binding_register.add_argument("--operation-version", type=int)
+    question_binding_activate = question_binding_subparsers.add_parser("activate")
+    question_binding_activate.add_argument("id")
+    question_binding_activate.add_argument("--database", required=True)
+    question_binding_get = question_binding_subparsers.add_parser("get")
+    question_binding_get.add_argument("project_id")
+    question_binding_get.add_argument("binding_id")
+    question_binding_get.add_argument("--version", type=int)
+    question_binding_list = question_binding_subparsers.add_parser("list")
+    question_binding_list.add_argument("project_id")
+    question_binding_execute = question_binding_subparsers.add_parser("execute")
+    question_binding_execute.add_argument("project_id")
+    question_binding_execute.add_argument("binding_id")
+    question_binding_execute.add_argument("run_id")
+    question_binding_execute.add_argument("--database", required=True)
+    question_binding_execute.add_argument("--version", type=int)
+    question_binding_execute.add_argument("--parameters-json", default="{}")
+
     starter_dwh = subparsers.add_parser("starter-dwh", help="Manage the FP&A starter DWH")
     starter_dwh_subparsers = starter_dwh.add_subparsers(
         dest="starter_dwh_command",
@@ -418,6 +484,10 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_graph_proposal(core, args)
     if args.command == "graph-publication":
         return _dispatch_graph_publication(core, args)
+    if args.command == "data-operation":
+        return _dispatch_data_operation(core, args)
+    if args.command == "question-binding":
+        return _dispatch_question_binding(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
     if args.command == "finance-foundation":
@@ -639,6 +709,66 @@ def _dispatch_graph_publication(core: KdafCore, args: argparse.Namespace) -> Any
     )
 
 
+def _dispatch_data_operation(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.data_operation_command == "register":
+        return core.register_data_operation(
+            args.project_id,
+            args.operation_id,
+            statement=_read_text(args.statement_file, "statement"),
+            parameter_schema=_read_json_object(
+                args.parameter_schema_file,
+                "parameter schema",
+            ),
+            result_schema=_read_json_object(args.result_schema_file, "result schema"),
+            evidence_eligible=not args.not_evidence_eligible,
+            max_rows=args.max_rows,
+        )
+    if args.data_operation_command == "list":
+        return core.list_data_operations(args.project_id)
+    if args.data_operation_command == "get":
+        return core.get_data_operation(
+            args.project_id,
+            args.operation_id,
+            version=args.version,
+        )
+    raise KdafError(f"Unknown data operation command: {args.data_operation_command}")
+
+
+def _dispatch_question_binding(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.question_binding_command == "register":
+        return core.register_question_binding(
+            args.project_id,
+            args.binding_id,
+            args.question_id,
+            evidence_mode=args.evidence_mode,
+            required_concept_ids=args.concept_ids,
+            graph_publication_id=args.publication_id,
+            data_operation_id=args.operation_id,
+            data_operation_version=args.operation_version,
+        )
+    if args.question_binding_command == "activate":
+        return core.activate_question_binding(args.id, args.database)
+    if args.question_binding_command == "get":
+        return core.get_question_binding(
+            args.project_id,
+            args.binding_id,
+            version=args.version,
+        )
+    if args.question_binding_command == "list":
+        return core.list_question_bindings(args.project_id)
+    if args.question_binding_command == "execute":
+        return core.execute_question_binding(
+            args.project_id,
+            args.binding_id,
+            args.run_id,
+            args.database,
+            version=args.version,
+            parameters=_parse_json_object(args.parameters_json, "parameters-json"),
+            dwh_store_path=args.dwh_store,
+        )
+    raise KdafError(f"Unknown question binding command: {args.question_binding_command}")
+
+
 def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.starter_dwh_command == "schema":
         return core.starter_dwh_schema()
@@ -752,6 +882,16 @@ def _read_json_object(path: Path, option: str) -> dict[str, Any]:
     except OSError as exc:
         raise KdafError(f"{option} file could not be read", code="not_found") from exc
     return _parse_json_object(raw, option)
+
+
+def _read_text(path: Path, option: str) -> str:
+    try:
+        value = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise KdafError(f"{option} file could not be read", code="not_found") from exc
+    if not value.strip():
+        raise KdafError(f"{option} file must not be empty", code="invalid_input")
+    return value
 
 
 def _write_json(payload: Any, output: TextIO) -> None:
