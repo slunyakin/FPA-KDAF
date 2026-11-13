@@ -1,3 +1,5 @@
+// Compatibility artifact. The public finance-foundation initializer records
+// version and ownership and is the supported path for managed installations.
 CREATE CONSTRAINT semantic_concept_id IF NOT EXISTS
 FOR (concept:SemanticConcept)
 REQUIRE concept.id IS UNIQUE;
@@ -7,7 +9,7 @@ FOR (dimension:DwhDimension)
 REQUIRE dimension.id IS UNIQUE;
 
 MERGE (domain:FinanceDomain:SemanticConcept {id: 'domain:fpna_starter'})
-SET domain.name = 'FP&A Starter Kit',
+ON CREATE SET domain.name = 'FP&A Starter Kit',
     domain.description = 'Starter semantic context for finance analytics';
 
 MATCH (domain:FinanceDomain:SemanticConcept {id: 'domain:fpna_starter'})
@@ -21,10 +23,10 @@ UNWIND [
   {id: 'account:headcount', name: 'Headcount', table: 'fpna_accounts', key: 'account_id', value: 'headcount'}
 ] AS row
 MERGE (concept:AccountConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name,
+ON CREATE SET concept.name = row.name,
     concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
-SET reference.table = row.table,
+ON CREATE SET reference.table = row.table,
     reference.key = row.key,
     reference.value = row.value
 MERGE (domain)-[:HAS_CONCEPT]->(concept)
@@ -39,10 +41,10 @@ UNWIND [
   {id: 'department:g_and_a', name: 'G&A', table: 'fpna_departments', key: 'department_id', value: 'g_and_a'}
 ] AS row
 MERGE (concept:DepartmentConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name,
+ON CREATE SET concept.name = row.name,
     concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
-SET reference.table = row.table,
+ON CREATE SET reference.table = row.table,
     reference.key = row.key,
     reference.value = row.value
 MERGE (domain)-[:HAS_CONCEPT]->(concept)
@@ -56,10 +58,10 @@ UNWIND [
   {id: 'scenario:forecast', name: 'Q1 Forecast', table: 'fpna_scenarios', key: 'scenario_id', value: 'forecast'}
 ] AS row
 MERGE (concept:ScenarioConcept:SemanticConcept {id: row.id})
-SET concept.name = row.name,
+ON CREATE SET concept.name = row.name,
     concept.validation_state = 'seeded'
 MERGE (reference:DwhDimension {id: 'dwh:' + row.table + ':' + row.value})
-SET reference.table = row.table,
+ON CREATE SET reference.table = row.table,
     reference.key = row.key,
     reference.value = row.value
 MERGE (domain)-[:HAS_CONCEPT]->(concept)
@@ -109,7 +111,7 @@ UNWIND [
   }
 ] AS row
 MERGE (metric:MetricConcept:SemanticConcept {id: row.id})
-SET metric.name = row.name,
+ON CREATE SET metric.name = row.name,
     metric.description = row.description,
     metric.validation_state = 'seeded'
 MERGE (domain)-[:HAS_CONCEPT]->(metric)

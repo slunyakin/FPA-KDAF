@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "foundation_id": "kdaf.finance.foundation",
+  "version": "1.0.0",
+  "owner": "kdaf",
+  "name": "KDAF Finance Foundation",
+  "description": "A small reusable finance vocabulary for question-driven graph development.",
+  "provenance": {
+    "kind": "packaged_resource",
+    "source": "kdaf/resources/starter_graph/foundation_manifest.json"
+  },
+  "components": [
+    {
+      "id": "kdaf.finance.foundation.core",
+      "kind": "foundation",
+      "description": "Portable finance concepts and semantic dependencies."
+    },
+    {
+      "id": "kdaf.finance.foundation.starter_profile",
+      "kind": "starter_profile",
+      "description": "Example organizational concepts retained for starter-kit compatibility."
+    },
+    {
+      "id": "kdaf.finance.foundation.starter_dwh_bindings",
+      "kind": "starter_bindings",
+      "description": "Example warehouse references for the packaged starter dataset."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "domain:fpna_starter",
+      "labels": ["FinanceDomain"],
+      "name": "Finance Analytics Foundation",
+      "description": "Shared semantic context for finance planning and analysis.",
+      "legacy_names": ["FP&A Starter Kit"],
+      "legacy_descriptions": ["Starter semantic context for finance analytics"],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "account:revenue",
+      "labels": ["AccountConcept"],
+      "name": "Revenue",
+      "description": "Income recognized from ordinary business activities.",
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "account:cogs",
+      "labels": ["AccountConcept"],
+      "name": "Cost of Goods Sold",
+      "description": "Direct costs attributable to goods or services sold.",
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "account:payroll",
+      "labels": ["AccountConcept"],
+      "name": "Payroll Expense",
+      "description": "Employee compensation and related payroll costs.",
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "account:headcount",
+      "labels": ["AccountConcept"],
+      "name": "Headcount",
+      "description": "Number of people included in a defined workforce scope.",
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "scenario:actual",
+      "labels": ["ScenarioConcept"],
+      "name": "Actual",
+      "description": "Observed results for a completed or current reporting period.",
+      "legacy_names": ["Actuals"],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "scenario:budget",
+      "labels": ["ScenarioConcept"],
+      "name": "Budget",
+      "description": "An approved financial plan for a defined period and scope.",
+      "legacy_names": ["Board Budget"],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "scenario:forecast",
+      "labels": ["ScenarioConcept"],
+      "name": "Forecast",
+      "description": "A current estimate of future financial or operational results.",
+      "legacy_names": ["Q1 Forecast"],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "metric:budget_vs_actuals",
+      "labels": ["MetricConcept"],
+      "name": "Budget versus actual",
+      "description": "Compares observed results with an approved budget.",
+      "legacy_names": ["Budget vs actuals"],
+      "legacy_descriptions": ["Compares actual financial performance against the board budget."],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "metric:forecast_movement",
+      "labels": ["MetricConcept"],
+      "name": "Forecast movement",
+      "description": "Compares forecast versions or a forecast with observed results.",
+      "legacy_descriptions": ["Compares current forecast expectations against actuals."],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "metric:revenue_driver",
+      "labels": ["MetricConcept"],
+      "name": "Revenue driver",
+      "description": "Connects revenue outcomes to an explicitly defined operational driver.",
+      "legacy_descriptions": ["Connects revenue outcomes to operational drivers."],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "metric:variance",
+      "labels": ["MetricConcept"],
+      "name": "Variance",
+      "description": "Difference between two comparable values under a registered convention.",
+      "legacy_descriptions": ["Computes actual minus plan variance for finance review."],
+      "component_id": "kdaf.finance.foundation.core"
+    },
+    {
+      "id": "account:cloud_hosting",
+      "labels": ["AccountConcept"],
+      "name": "Cloud Hosting",
+      "description": "Example technology infrastructure expense used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "account:marketing_spend",
+      "labels": ["AccountConcept"],
+      "name": "Marketing Spend",
+      "description": "Example marketing expense used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "department:sales",
+      "labels": ["DepartmentConcept"],
+      "name": "Sales",
+      "description": "Example organizational unit used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "department:marketing",
+      "labels": ["DepartmentConcept"],
+      "name": "Marketing",
+      "description": "Example organizational unit used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "department:engineering",
+      "labels": ["DepartmentConcept"],
+      "name": "Engineering",
+      "description": "Example organizational unit used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "department:g_and_a",
+      "labels": ["DepartmentConcept"],
+      "name": "G&A",
+      "description": "Example general and administrative unit used by the starter profile.",
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    },
+    {
+      "id": "metric:department_spend",
+      "labels": ["MetricConcept"],
+      "name": "Department spend",
+      "description": "Example view of operating expense by organizational unit.",
+      "legacy_descriptions": ["Explains operating expense by department."],
+      "component_id": "kdaf.finance.foundation.starter_profile"
+    }
+  ],
+  "relationships": [
+    {"id": "has:revenue", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:revenue"},
+    {"id": "has:cogs", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:cogs"},
+    {"id": "has:payroll", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:payroll"},
+    {"id": "has:headcount", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:headcount"},
+    {"id": "has:actual", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "scenario:actual"},
+    {"id": "has:budget", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "scenario:budget"},
+    {"id": "has:forecast", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "scenario:forecast"},
+    {"id": "has:budget_vs_actuals", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "metric:budget_vs_actuals"},
+    {"id": "has:forecast_movement", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "metric:forecast_movement"},
+    {"id": "has:revenue_driver", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "metric:revenue_driver"},
+    {"id": "has:variance", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "metric:variance"},
+    {"id": "depends:budget_vs_actuals:revenue", "type": "DEPENDS_ON", "source_id": "metric:budget_vs_actuals", "target_id": "account:revenue"},
+    {"id": "depends:budget_vs_actuals:actual", "type": "DEPENDS_ON", "source_id": "metric:budget_vs_actuals", "target_id": "scenario:actual"},
+    {"id": "depends:budget_vs_actuals:budget", "type": "DEPENDS_ON", "source_id": "metric:budget_vs_actuals", "target_id": "scenario:budget"},
+    {"id": "depends:forecast_movement:revenue", "type": "DEPENDS_ON", "source_id": "metric:forecast_movement", "target_id": "account:revenue"},
+    {"id": "depends:forecast_movement:actual", "type": "DEPENDS_ON", "source_id": "metric:forecast_movement", "target_id": "scenario:actual"},
+    {"id": "depends:forecast_movement:forecast", "type": "DEPENDS_ON", "source_id": "metric:forecast_movement", "target_id": "scenario:forecast"},
+    {"id": "depends:revenue_driver:revenue", "type": "DEPENDS_ON", "source_id": "metric:revenue_driver", "target_id": "account:revenue"},
+    {"id": "depends:revenue_driver:headcount", "type": "DEPENDS_ON", "source_id": "metric:revenue_driver", "target_id": "account:headcount"},
+    {"id": "depends:revenue_driver:actual", "type": "DEPENDS_ON", "source_id": "metric:revenue_driver", "target_id": "scenario:actual"},
+    {"id": "depends:variance:actual", "type": "DEPENDS_ON", "source_id": "metric:variance", "target_id": "scenario:actual"},
+    {"id": "depends:variance:budget", "type": "DEPENDS_ON", "source_id": "metric:variance", "target_id": "scenario:budget"},
+    {"id": "has:cloud_hosting", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:cloud_hosting"},
+    {"id": "has:marketing_spend", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "account:marketing_spend"},
+    {"id": "has:sales", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "department:sales"},
+    {"id": "has:marketing", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "department:marketing"},
+    {"id": "has:engineering", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "department:engineering"},
+    {"id": "has:g_and_a", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "department:g_and_a"},
+    {"id": "has:department_spend", "type": "HAS_CONCEPT", "source_id": "domain:fpna_starter", "target_id": "metric:department_spend"},
+    {"id": "depends:department_spend:payroll", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "account:payroll"},
+    {"id": "depends:department_spend:cloud_hosting", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "account:cloud_hosting"},
+    {"id": "depends:department_spend:marketing_spend", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "account:marketing_spend"},
+    {"id": "depends:department_spend:sales", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "department:sales"},
+    {"id": "depends:department_spend:marketing", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "department:marketing"},
+    {"id": "depends:department_spend:engineering", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "department:engineering"},
+    {"id": "depends:department_spend:g_and_a", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "department:g_and_a"},
+    {"id": "depends:department_spend:actual", "type": "DEPENDS_ON", "source_id": "metric:department_spend", "target_id": "scenario:actual"}
+  ],
+  "starter_dwh_bindings": [
+    {"concept_id": "account:revenue", "table": "fpna_accounts", "key": "account_id", "value": "revenue"},
+    {"concept_id": "account:cogs", "table": "fpna_accounts", "key": "account_id", "value": "cogs"},
+    {"concept_id": "account:payroll", "table": "fpna_accounts", "key": "account_id", "value": "payroll"},
+    {"concept_id": "account:cloud_hosting", "table": "fpna_accounts", "key": "account_id", "value": "cloud_hosting"},
+    {"concept_id": "account:marketing_spend", "table": "fpna_accounts", "key": "account_id", "value": "marketing_spend"},
+    {"concept_id": "account:headcount", "table": "fpna_accounts", "key": "account_id", "value": "headcount"},
+    {"concept_id": "department:sales", "table": "fpna_departments", "key": "department_id", "value": "sales"},
+    {"concept_id": "department:marketing", "table": "fpna_departments", "key": "department_id", "value": "marketing"},
+    {"concept_id": "department:engineering", "table": "fpna_departments", "key": "department_id", "value": "engineering"},
+    {"concept_id": "department:g_and_a", "table": "fpna_departments", "key": "department_id", "value": "g_and_a"},
+    {"concept_id": "scenario:actual", "table": "fpna_scenarios", "key": "scenario_id", "value": "actual"},
+    {"concept_id": "scenario:budget", "table": "fpna_scenarios", "key": "scenario_id", "value": "budget"},
+    {"concept_id": "scenario:forecast", "table": "fpna_scenarios", "key": "scenario_id", "value": "forecast"}
+  ]
+}

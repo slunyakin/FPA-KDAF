@@ -118,7 +118,7 @@ def main() -> int:
         _run_expected_error(
             [kdaf_command, "starter-graph", "load"],
             workdir,
-            "starter_graph_error",
+            "neo4j_driver_missing",
             "kdaf[neo4j]",
         )
 

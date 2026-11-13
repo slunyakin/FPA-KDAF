@@ -38,6 +38,7 @@ from kdaf.starter_graph import (
     Neo4jConnectionSettings,
     StarterGraphError,
     StarterGraphRepository,
+    finance_foundation_manifest,
     starter_graph_cypher_artifacts,
 )
 from kdaf.starter_kit import StarterKitService
@@ -880,27 +881,84 @@ class KdafCore:
             password=config.password,
         )
 
-    def starter_graph_schema(self) -> dict[str, str]:
+    def starter_graph_schema(self) -> dict[str, Any]:
         artifacts = starter_graph_cypher_artifacts()
         return {
             "dialect": "cypher",
             "seed_cypher": artifacts["seed"],
             "sample_queries_cypher": artifacts["sample_queries"],
+            "foundation_manifest": finance_foundation_manifest(),
         }
+
+    def finance_foundation_manifest(self) -> dict[str, Any]:
+        return finance_foundation_manifest()
+
+    def plan_finance_foundation(
+        self,
+        expected_database: str,
+        *,
+        include_starter_profile: bool = False,
+        include_starter_bindings: bool = False,
+    ) -> dict[str, Any]:
+        repository = StarterGraphRepository(self._neo4j_connection_settings())
+        try:
+            return repository.plan_foundation(
+                expected_database=expected_database,
+                include_starter_profile=include_starter_profile,
+                include_starter_bindings=include_starter_bindings,
+            )
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def initialize_finance_foundation(
+        self,
+        expected_database: str,
+        *,
+        include_starter_profile: bool = False,
+        include_starter_bindings: bool = False,
+    ) -> dict[str, Any]:
+        repository = StarterGraphRepository(self._neo4j_connection_settings())
+        try:
+            result = repository.initialize_foundation(
+                expected_database=expected_database,
+                include_starter_profile=include_starter_profile,
+                include_starter_bindings=include_starter_bindings,
+            ).to_dict()
+            self.metadata.record_audit_event(
+                "finance_foundation.initialized",
+                "finance_foundation",
+                result["foundation_id"],
+                {
+                    "database": result["database"],
+                    "foundation_version": result["foundation_version"],
+                    "status": result["status"],
+                    "installed_components": result["installed_components"],
+                },
+            )
+            return result
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
+
+    def inspect_finance_foundation(self, expected_database: str) -> dict[str, Any]:
+        repository = StarterGraphRepository(self._neo4j_connection_settings())
+        try:
+            return repository.inspect_foundation(expected_database=expected_database)
+        except StarterGraphError as exc:
+            raise KdafError(str(exc), code=exc.code) from exc
 
     def load_starter_graph(self) -> dict[str, Any]:
         repository = StarterGraphRepository(self._neo4j_connection_settings())
         try:
             return repository.load_seed_data().to_dict()
         except StarterGraphError as exc:
-            raise KdafError(str(exc), code="starter_graph_error") from exc
+            raise KdafError(str(exc), code=exc.code) from exc
 
     def starter_graph_context(self) -> dict[str, Any]:
         repository = StarterGraphRepository(self._neo4j_connection_settings())
         try:
             return repository.inspect_context()
         except StarterGraphError as exc:
-            raise KdafError(str(exc), code="starter_graph_not_loaded") from exc
+            raise KdafError(str(exc), code=exc.code) from exc
 
     def starter_question_catalog(self) -> dict[str, Any]:
         try:
