@@ -140,6 +140,8 @@ def test_schema_contains_v02_extension_points(tmp_path) -> None:
         "kdaf_discovery_handoffs",
         "kdaf_graph_extension_proposals",
         "kdaf_graph_extension_publications",
+        "kdaf_data_operations",
+        "kdaf_question_bindings",
     } <= repository.table_names()
 
 
