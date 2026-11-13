@@ -27,6 +27,13 @@ TOOL_NAMES = (
     "mvg.get",
     "mvg.add_question",
     "mvg.add_concept",
+    "discovery_handoff.import",
+    "discovery_handoff.list",
+    "discovery_handoff.get",
+    "graph_proposal.create",
+    "graph_proposal.list",
+    "graph_proposal.get",
+    "graph_proposal.coverage",
     "starter_dwh.schema",
     "starter_dwh.load",
     "starter_dwh.facts",
@@ -192,6 +199,38 @@ def call_tool(tool_name: str, arguments: dict[str, Any] | None, core: KdafCore) 
             mvg_id=_required_arg(args, "mvg_id"),
             concept_id=_required_arg(args, "concept_id"),
         )
+    if tool_name == "discovery_handoff.import":
+        return core.import_discovery_handoff(
+            _required_arg(args, "project_id"),
+            _required_object_arg(args, "handoff"),
+        )
+    if tool_name == "discovery_handoff.list":
+        return core.list_discovery_handoffs(args.get("project_id"))
+    if tool_name == "discovery_handoff.get":
+        return core.get_discovery_handoff(_required_arg(args, "id"))
+    if tool_name == "graph_proposal.create":
+        return core.create_graph_extension_proposal(
+            _required_arg(args, "handoff_id"),
+            offline_graph=_optional_bool_arg(args, "offline_graph", default=True),
+            proposal_payload=_nullable_object_arg(args, "proposal"),
+            provider_name=_optional_string_arg(args, "provider") or "external",
+            model=_optional_string_arg(args, "model"),
+        )
+    if tool_name == "graph_proposal.list":
+        return core.list_graph_extension_proposals(
+            project_id=args.get("project_id"),
+            handoff_id=args.get("handoff_id"),
+        )
+    if tool_name == "graph_proposal.get":
+        return core.get_graph_extension_proposal(_required_arg(args, "id"))
+    if tool_name == "graph_proposal.coverage":
+        proposal = core.get_graph_extension_proposal(_required_arg(args, "id"))
+        return {
+            "proposal_id": proposal["id"],
+            "proposal_version": proposal["proposal_version"],
+            "status": proposal["status"],
+            "coverage": proposal["coverage"],
+        }
     if tool_name == "starter_dwh.schema":
         return core.starter_dwh_schema()
     if tool_name == "starter_dwh.load":
@@ -404,6 +443,17 @@ def _required_object_arg(arguments: dict[str, Any], name: str) -> dict[str, Any]
 
 def _optional_object_arg(arguments: dict[str, Any], name: str) -> dict[str, Any]:
     value = arguments.get(name, {})
+    if not isinstance(value, dict):
+        raise KdafError(f"Argument must be an object: {name}", code="invalid_argument")
+    return value
+
+
+def _nullable_object_arg(
+    arguments: dict[str, Any], name: str
+) -> dict[str, Any] | None:
+    if name not in arguments or arguments[name] is None:
+        return None
+    value = arguments[name]
     if not isinstance(value, dict):
         raise KdafError(f"Argument must be an object: {name}", code="invalid_argument")
     return value

@@ -102,6 +102,44 @@ def build_parser() -> argparse.ArgumentParser:
     mvg_add_concept.add_argument("mvg_id")
     mvg_add_concept.add_argument("concept_id")
 
+    discovery = subparsers.add_parser(
+        "discovery-handoff",
+        help="Import and inspect confirmed discovery handoffs",
+    )
+    discovery_subparsers = discovery.add_subparsers(
+        dest="discovery_command",
+        required=True,
+    )
+    discovery_import = discovery_subparsers.add_parser("import")
+    discovery_import.add_argument("project_id")
+    discovery_import.add_argument("handoff_file", type=Path)
+    discovery_list = discovery_subparsers.add_parser("list")
+    discovery_list.add_argument("--project-id")
+    discovery_get = discovery_subparsers.add_parser("get")
+    discovery_get.add_argument("id")
+
+    graph_proposal = subparsers.add_parser(
+        "graph-proposal",
+        help="Create and inspect question-specific graph proposals",
+    )
+    graph_proposal_subparsers = graph_proposal.add_subparsers(
+        dest="graph_proposal_command",
+        required=True,
+    )
+    graph_proposal_create = graph_proposal_subparsers.add_parser("create")
+    graph_proposal_create.add_argument("handoff_id")
+    graph_proposal_create.add_argument("--live-graph", action="store_true")
+    graph_proposal_create.add_argument("--proposal-file", type=Path)
+    graph_proposal_create.add_argument("--provider", default="external")
+    graph_proposal_create.add_argument("--model")
+    graph_proposal_list = graph_proposal_subparsers.add_parser("list")
+    graph_proposal_list.add_argument("--project-id")
+    graph_proposal_list.add_argument("--handoff-id")
+    graph_proposal_get = graph_proposal_subparsers.add_parser("get")
+    graph_proposal_get.add_argument("id")
+    graph_proposal_coverage = graph_proposal_subparsers.add_parser("coverage")
+    graph_proposal_coverage.add_argument("id")
+
     starter_dwh = subparsers.add_parser("starter-dwh", help="Manage the FP&A starter DWH")
     starter_dwh_subparsers = starter_dwh.add_subparsers(
         dest="starter_dwh_command",
@@ -338,6 +376,10 @@ def _dispatch(args: argparse.Namespace) -> Any:
         return _dispatch_competency_question(core, args)
     if args.command == "mvg":
         return _dispatch_mvg(core, args)
+    if args.command == "discovery-handoff":
+        return _dispatch_discovery_handoff(core, args)
+    if args.command == "graph-proposal":
+        return _dispatch_graph_proposal(core, args)
     if args.command == "starter-dwh":
         return _dispatch_starter_dwh(core, args)
     if args.command == "finance-foundation":
@@ -470,6 +512,51 @@ def _dispatch_mvg(core: KdafCore, args: argparse.Namespace) -> Any:
     if args.mvg_command == "add-concept":
         return core.add_concept_to_mvg(args.mvg_id, args.concept_id)
     raise KdafError(f"Unknown MVG command: {args.mvg_command}")
+
+
+def _dispatch_discovery_handoff(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.discovery_command == "import":
+        return core.import_discovery_handoff(
+            args.project_id,
+            _read_json_object(args.handoff_file, "handoff"),
+        )
+    if args.discovery_command == "list":
+        return core.list_discovery_handoffs(args.project_id)
+    if args.discovery_command == "get":
+        return core.get_discovery_handoff(args.id)
+    raise KdafError(f"Unknown discovery handoff command: {args.discovery_command}")
+
+
+def _dispatch_graph_proposal(core: KdafCore, args: argparse.Namespace) -> Any:
+    if args.graph_proposal_command == "create":
+        proposal_payload = (
+            _read_json_object(args.proposal_file, "proposal")
+            if args.proposal_file is not None
+            else None
+        )
+        return core.create_graph_extension_proposal(
+            args.handoff_id,
+            offline_graph=not args.live_graph,
+            proposal_payload=proposal_payload,
+            provider_name=args.provider,
+            model=args.model,
+        )
+    if args.graph_proposal_command == "list":
+        return core.list_graph_extension_proposals(
+            project_id=args.project_id,
+            handoff_id=args.handoff_id,
+        )
+    if args.graph_proposal_command == "get":
+        return core.get_graph_extension_proposal(args.id)
+    if args.graph_proposal_command == "coverage":
+        proposal = core.get_graph_extension_proposal(args.id)
+        return {
+            "proposal_id": proposal["id"],
+            "proposal_version": proposal["proposal_version"],
+            "status": proposal["status"],
+            "coverage": proposal["coverage"],
+        }
+    raise KdafError(f"Unknown graph proposal command: {args.graph_proposal_command}")
 
 
 def _dispatch_starter_dwh(core: KdafCore, args: argparse.Namespace) -> Any:

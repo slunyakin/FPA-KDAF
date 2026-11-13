@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from kdaf._version import __version__
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 VALIDATION_STATUSES = frozenset({"pending", "approved", "rejected", "needs_changes"})
 TERMINAL_VALIDATION_STATUSES = frozenset({"approved", "rejected"})
 
@@ -208,6 +208,36 @@ class EvaluationResult:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class DiscoveryHandoffRecord:
+    id: str
+    project_id: str
+    schema_version: int
+    status: str
+    payload: dict[str, Any]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class GraphExtensionProposalRecord:
+    id: str
+    project_id: str
+    handoff_id: str
+    proposal_version: int
+    status: str
+    base_graph_version: str
+    proposer: dict[str, Any]
+    payload: dict[str, Any]
+    coverage: dict[str, Any]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class MetadataRepository:
     """SQLite local adapter for framework, MVG, and audit workflow metadata."""
 
@@ -371,6 +401,151 @@ class MetadataRepository:
         with self._connect() as connection:
             rows = connection.execute(query + " ORDER BY created_at, id", params).fetchall()
         return [_evaluation_result_from_row(row) for row in rows]
+
+    def create_discovery_handoff(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        status: str = "confirmed",
+    ) -> DiscoveryHandoffRecord:
+        project = self.get_project(project_id)
+        cleaned_payload = _require_object("discovery_handoff.payload", payload)
+        record = DiscoveryHandoffRecord(
+            id=str(uuid4()),
+            project_id=project.id,
+            schema_version=int(cleaned_payload.get("schema_version", 1)),
+            status=_require_text("discovery_handoff.status", status),
+            payload=cleaned_payload,
+            created_at=_timestamp(),
+        )
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO kdaf_discovery_handoffs (
+                    id, project_id, schema_version, status, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.project_id,
+                    record.schema_version,
+                    record.status,
+                    _json(record.payload),
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def get_discovery_handoff(self, handoff_id: str) -> DiscoveryHandoffRecord:
+        row = self._fetch_one(
+            "SELECT * FROM kdaf_discovery_handoffs WHERE id = ?",
+            (_require_text("discovery_handoff.id", handoff_id),),
+        )
+        if row is None:
+            raise MetadataError(f"Discovery handoff not found: {handoff_id}", "not_found")
+        return _discovery_handoff_from_row(row)
+
+    def list_discovery_handoffs(
+        self, project_id: str | None = None
+    ) -> list[DiscoveryHandoffRecord]:
+        query = "SELECT * FROM kdaf_discovery_handoffs"
+        params: tuple[str, ...] = ()
+        if project_id is not None:
+            project = self.get_project(project_id)
+            query += " WHERE project_id = ?"
+            params = (project.id,)
+        with self._connect() as connection:
+            rows = connection.execute(query + " ORDER BY created_at, id", params).fetchall()
+        return [_discovery_handoff_from_row(row) for row in rows]
+
+    def create_graph_extension_proposal(
+        self,
+        *,
+        project_id: str,
+        handoff_id: str,
+        status: str,
+        base_graph_version: str,
+        proposer: dict[str, Any],
+        payload: dict[str, Any],
+        coverage: dict[str, Any],
+    ) -> GraphExtensionProposalRecord:
+        project = self.get_project(project_id)
+        handoff = self.get_discovery_handoff(handoff_id)
+        if handoff.project_id != project.id:
+            raise MetadataError(
+                "Discovery handoff and graph proposal must belong to the same project",
+                "invalid_scope",
+            )
+        record_id = str(uuid4())
+        created_at = _timestamp()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT coalesce(max(proposal_version), 0) + 1 AS next_version
+                FROM kdaf_graph_extension_proposals WHERE handoff_id = ?
+                """,
+                (handoff.id,),
+            ).fetchone()
+            proposal_version = int(row["next_version"])
+            connection.execute(
+                """
+                INSERT INTO kdaf_graph_extension_proposals (
+                    id, project_id, handoff_id, proposal_version, status,
+                    base_graph_version, proposer_json, payload_json, coverage_json,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record_id,
+                    project.id,
+                    handoff.id,
+                    proposal_version,
+                    _require_text("graph_proposal.status", status),
+                    _require_text("graph_proposal.base_graph_version", base_graph_version),
+                    _json(_require_object("graph_proposal.proposer", proposer)),
+                    _json(_require_object("graph_proposal.payload", payload)),
+                    _json(_require_object("graph_proposal.coverage", coverage)),
+                    created_at,
+                ),
+            )
+        return self.get_graph_extension_proposal(record_id)
+
+    def get_graph_extension_proposal(
+        self, proposal_id: str
+    ) -> GraphExtensionProposalRecord:
+        row = self._fetch_one(
+            "SELECT * FROM kdaf_graph_extension_proposals WHERE id = ?",
+            (_require_text("graph_proposal.id", proposal_id),),
+        )
+        if row is None:
+            raise MetadataError(f"Graph extension proposal not found: {proposal_id}", "not_found")
+        return _graph_extension_proposal_from_row(row)
+
+    def list_graph_extension_proposals(
+        self,
+        *,
+        project_id: str | None = None,
+        handoff_id: str | None = None,
+    ) -> list[GraphExtensionProposalRecord]:
+        query = "SELECT * FROM kdaf_graph_extension_proposals"
+        clauses: list[str] = []
+        params: list[str] = []
+        if project_id is not None:
+            project = self.get_project(project_id)
+            clauses.append("project_id = ?")
+            params.append(project.id)
+        if handoff_id is not None:
+            handoff = self.get_discovery_handoff(handoff_id)
+            clauses.append("handoff_id = ?")
+            params.append(handoff.id)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at, id"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [_graph_extension_proposal_from_row(row) for row in rows]
 
     def record_audit_event(
         self,
@@ -1115,6 +1290,33 @@ def _schema_sql() -> str:
         mvg_id TEXT NOT NULL REFERENCES kdaf_mvg_artifacts(id) ON DELETE CASCADE,
         concept_id TEXT NOT NULL, PRIMARY KEY (mvg_id, concept_id)
     );
+    CREATE TABLE IF NOT EXISTS kdaf_discovery_handoffs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
+        schema_version INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS kdaf_graph_extension_proposals (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES kdaf_projects(id),
+        handoff_id TEXT NOT NULL REFERENCES kdaf_discovery_handoffs(id),
+        proposal_version INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        base_graph_version TEXT NOT NULL,
+        proposer_json TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        coverage_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (handoff_id, proposal_version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_kdaf_discovery_handoffs_project
+        ON kdaf_discovery_handoffs(project_id);
+    CREATE INDEX IF NOT EXISTS idx_kdaf_graph_proposals_project
+        ON kdaf_graph_extension_proposals(project_id);
+    CREATE INDEX IF NOT EXISTS idx_kdaf_graph_proposals_handoff
+        ON kdaf_graph_extension_proposals(handoff_id);
     """
 
 
@@ -1158,6 +1360,34 @@ def _add_missing_columns(
     for name, declaration in columns.items():
         if name not in existing:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _discovery_handoff_from_row(row: sqlite3.Row) -> DiscoveryHandoffRecord:
+    return DiscoveryHandoffRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        schema_version=int(row["schema_version"]),
+        status=row["status"],
+        payload=json.loads(row["payload_json"]),
+        created_at=row["created_at"],
+    )
+
+
+def _graph_extension_proposal_from_row(
+    row: sqlite3.Row,
+) -> GraphExtensionProposalRecord:
+    return GraphExtensionProposalRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        handoff_id=row["handoff_id"],
+        proposal_version=int(row["proposal_version"]),
+        status=row["status"],
+        base_graph_version=row["base_graph_version"],
+        proposer=json.loads(row["proposer_json"]),
+        payload=json.loads(row["payload_json"]),
+        coverage=json.loads(row["coverage_json"]),
+        created_at=row["created_at"],
+    )
 
 
 def _source_from_row(row: sqlite3.Row) -> Source:
